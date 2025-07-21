@@ -5,9 +5,10 @@ from PIL import Image
 import pytesseract
 import re
 
-# Directory containing screenshots
-input_dir = 'screen-captures'
-output_json = 'screen_captures_ocr.json'
+# Paths
+CACHE_DIR = os.path.expanduser('~/Library/Caches/analysis-lens')
+input_dir = os.path.join(CACHE_DIR, 'screen-captures')
+output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
 
 ocr_results = []
 
