@@ -46,7 +46,6 @@ for idx, filename in enumerate(image_files, 1):
         'app_name': app_name,
         'timestamp': timestamp_iso,
         'window_title': None,
-        'text_lines': structured_text,
         'text_full': '\n'.join(structured_text)
     })
 

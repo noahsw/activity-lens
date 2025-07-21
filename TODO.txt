@@ -1,4 +1,4 @@
 TODO
 
 1. Use summarization instead of classification
-2. For common apps like Arc and Slack, read the main window to exclude unrelated stuff like menubars and lefthand nav
+2. For common apps Slack, read the main window to exclude unrelated stuff like menubars and lefthand nav

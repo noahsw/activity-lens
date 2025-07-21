@@ -111,7 +111,6 @@ def write_text_json(app_name, timestamp, text, window_title="", output_json="scr
         'app_name': app_name,
         'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
         'window_title': window_title,
-        'text_lines': text.splitlines(),
         'text_full': text
     }
     # Append to or create the JSON file
