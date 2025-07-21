@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from PIL import Image
 import pytesseract
+import re
 
 # Directory containing screenshots
 input_dir = 'screen-captures'
@@ -44,6 +45,7 @@ for idx, filename in enumerate(image_files, 1):
         'filename': filename,
         'app_name': app_name,
         'timestamp': timestamp_iso,
+        'window_title': None,
         'text_lines': structured_text,
         'text_full': '\n'.join(structured_text)
     })
