@@ -5,48 +5,25 @@ import os
 import Quartz.CoreGraphics as CG
 import subprocess
 import json
-import Quartz
-import Accessibility  # ensure Accessibility framework is loaded
-from AppKit import NSWorkspace  # type: ignore
 
-# Load AX (Accessibility) symbols, first from Accessibility then fallback to Quartz
-AXUIElementCreateApplication = getattr(Accessibility, 'AXUIElementCreateApplication', None) or getattr(Quartz, 'AXUIElementCreateApplication', None)
-AXUIElementCopyAttributeValue = getattr(Accessibility, 'AXUIElementCopyAttributeValue', None) or getattr(Quartz, 'AXUIElementCopyAttributeValue', None)
-kAXRoleAttribute = getattr(Accessibility, 'kAXRoleAttribute', None) or getattr(Quartz, 'kAXRoleAttribute', None)
-kAXChildrenAttribute = getattr(Accessibility, 'kAXChildrenAttribute', None) or getattr(Quartz, 'kAXChildrenAttribute', None)
-kAXValueAttribute = getattr(Accessibility, 'kAXValueAttribute', None) or getattr(Quartz, 'kAXValueAttribute', None)
-
-
-def frontmost_pid():
-    return NSWorkspace.sharedWorkspace().frontmostApplication().processIdentifier()
-
-
-def find_node(ax_el, wanted_roles=("AXWebArea", "AXList")):
-    if AXUIElementCopyAttributeValue is None:
-        return None
-    role = AXUIElementCopyAttributeValue(ax_el, kAXRoleAttribute, None)  # type: ignore
-    if role in wanted_roles:
-        return ax_el
-    children = AXUIElementCopyAttributeValue(ax_el, kAXChildrenAttribute, None) or []  # type: ignore
-    for ch in children:
-        hit = find_node(ch, wanted_roles)
-        if hit:
-            return hit
-    return None
+# -----------------------------------------------------------------------------
+# AppleScript-based visible text extraction (works without Accessibility bridge)
+# -----------------------------------------------------------------------------
 
 
 def grab_visible_text():
-    if AXUIElementCreateApplication is None:
-        print("AXUIElementCreateApplication is None")
-        return ""
+    """Return visible text of the frontmost application's windows using AppleScript."""
     try:
-        app_ax = AXUIElementCreateApplication(frontmost_pid())  # type: ignore
-        leaf = find_node(app_ax)
-        if not leaf:
-            return ""
-        val = AXUIElementCopyAttributeValue(leaf, kAXValueAttribute, None)  # type: ignore
-        return val or ""
-    except Exception:
+        script = (
+            'tell application "System Events" to tell (first application process whose frontmost is true) '
+            'to get value of every static text of windows'
+        )
+        raw = subprocess.check_output(['osascript', '-e', script]).decode('utf-8', errors='ignore')
+        # AppleScript returns items separated by ", "; replace with newlines
+        text = raw.replace(', ', '\n').strip()
+        return text
+    except Exception as e:
+        print(f"Error in grab_visible_text: {e}")
         return ""
 
 def get_focused_window_rect():
@@ -71,6 +48,7 @@ def get_active_app_name():
         app_name = "UnknownApp"
     # Sanitize app name for filename
     safe_app_name = "".join(c if c.isalnum() else "_" for c in app_name)
+    print("Active app name:", safe_app_name)
     return safe_app_name
 
 def write_text_json(app_name, timestamp, text, output_json="screen_captures_ocr.json"):
