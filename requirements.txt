@@ -1,0 +1,10 @@
+pyobjc
+pyautogui
+pillow
+pytesseract
+sentence-transformers
+faiss-cpu
+numpy
+pyyaml
+pandas
+pyobjc-framework-Accessibility
