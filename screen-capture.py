@@ -9,10 +9,25 @@ import json
 # -----------------------------------------------------------------------------
 # Paths
 # -----------------------------------------------------------------------------
-CACHE_DIR = os.path.expanduser('~/Library/Caches/analysis-lens')
+CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 SCREEN_DIR = os.path.join(CACHE_DIR, 'screen-captures')
 JSON_PATH   = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
 os.makedirs(SCREEN_DIR, exist_ok=True)
+
+# -----------------------------------------------------------------------------
+# Helper to append a metadata block to the master JSON file
+# -----------------------------------------------------------------------------
+
+
+def append_metadata(entry: dict):
+    if os.path.exists(JSON_PATH):
+        with open(JSON_PATH, 'r', encoding='utf-8') as jf:
+            data = json.load(jf)
+    else:
+        data = []
+    data.append(entry)
+    with open(JSON_PATH, 'w', encoding='utf-8') as jf:
+        json.dump(data, jf, indent=2, ensure_ascii=False)
 
 # Common browsers and their AppleScript JS execution commands
 browser_scripts = {
@@ -113,23 +128,29 @@ def get_active_app_names():
     print("Active app name:", safe_name)
     return raw_name, safe_name
 
-def write_text_json(app_name, timestamp, text, window_title="", output_json=JSON_PATH):
-    # Write a JSON entry in the same format as ocr_extract.py
+def write_text_entry(app_name, timestamp, text, window_title="", output_json=JSON_PATH):
+    """Save text to a .txt file and write a metadata entry to JSON."""
+    # Create human-readable filename: "YYYYMMDD HHMMSS - AppName.txt"
+    ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
+    txt_filename = f"{ts_readable} - {app_name}.txt"
+    txt_path = os.path.join(SCREEN_DIR, txt_filename)
+
+    # Skip writing empty files
+    if text.strip():
+        with open(txt_path, 'w', encoding='utf-8') as tf:
+            tf.write(text)
+        fname = txt_filename
+    else:
+        fname = None  # indicate no file was written
+
+    # Build JSON metadata entry (no text_full to keep JSON small)
     entry = {
+        'filename': fname,
         'app_name': app_name,
         'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
-        'window_title': window_title,
-        'text_full': text
+        'window_title': window_title
     }
-    # Append to or create the JSON file
-    if os.path.exists(output_json):
-        with open(output_json, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    else:
-        data = []
-    data.append(entry)
-    with open(output_json, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    append_metadata(entry)
     print(f"Text extracted and saved to {output_json}")
 
 def capture_focused_window():
@@ -146,14 +167,21 @@ def capture_focused_window():
         elif app_name == "Slack":
             window_title, text = slack_get_title_and_messages()
         elif app_name == "zoom_us":
-            write_text_json(app_name, timestamp, text="", window_title="Zoom Meeting")
+            # Just record focus time; no file written
+            metadata = {
+                'filename': None,
+                'app_name': app_name,
+                'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
+                'window_title': "Zoom Meeting"
+            }
+            append_metadata(metadata)
             return
         else:
             text = grab_visible_text()
             window_title = get_window_title()
 
         if text.strip():
-            write_text_json(app_name, timestamp, text, window_title)
+            write_text_entry(app_name, timestamp, text, window_title)
             return
         # If extracted text length is insignificantly small, treat as no text
         if len(text.strip()) < 10:
@@ -167,9 +195,18 @@ def capture_focused_window():
             screenshot = pyautogui.screenshot(region=(
                 int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height'])
             ))
-            filename = os.path.join(SCREEN_DIR, f"{app_name}_focused_window_{timestamp}.png")
+            ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
+            filename = os.path.join(SCREEN_DIR, f"{ts_readable} - {app_name}.png")
             screenshot.save(filename)
             print(f"Screenshot saved as: {filename}")
+            # Write metadata to JSON for PNG capture
+            entry = {
+                'filename': os.path.basename(filename),
+                'app_name': app_name,
+                'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
+                'window_title': window_title
+            }
+            append_metadata(entry)
             return
         # Otherwise text existed and was logged above
     except Exception as e:

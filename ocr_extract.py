@@ -6,7 +6,7 @@ import pytesseract
 import re
 
 # Paths
-CACHE_DIR = os.path.expanduser('~/Library/Caches/analysis-lens')
+CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 input_dir = os.path.join(CACHE_DIR, 'screen-captures')
 output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
 
