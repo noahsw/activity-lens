@@ -20,11 +20,12 @@ os.makedirs(SCREEN_DIR, exist_ok=True)
 
 
 def append_metadata(entry: dict):
-    if os.path.exists(JSON_PATH):
+    try:
         with open(JSON_PATH, 'r', encoding='utf-8') as jf:
             data = json.load(jf)
-    else:
-        data = []
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = []                          # start fresh if file missing or invalid
+
     data.append(entry)
     with open(JSON_PATH, 'w', encoding='utf-8') as jf:
         json.dump(data, jf, indent=2, ensure_ascii=False)
@@ -66,7 +67,7 @@ def grab_visible_text():
             'to get value of every static text of windows'
         )
         raw = subprocess.check_output(['osascript', '-e', static_text_script]).decode('utf-8', errors='ignore')
-        return raw.replace(', ', '\n').strip()
+        return raw.replace(', ', '\n').replace(', ', '\n').replace('\n', '\n').replace('\\n', '\n').strip()
 
     except subprocess.CalledProcessError as e:
         print(f"Error in grab_visible_text: {e}")
@@ -235,43 +236,29 @@ def slack_get_title_and_messages() -> tuple[str, str]:
     Returns (window_title, message_text) for the front-most Slack window.
     If anything fails, returns ("", "").
     """
-    slack_script = '''
-    on flatten(axList)
-        set outList to {}
-        repeat with e in axList
-            try
-                set v to value of e
-                if v is not missing value and v is not "" then set end of outList to v
-            end try
-            try
-                set outList to outList & flatten(UI elements of e)
-            end try
-        end repeat
-        return outList
-    end flatten
-
-    tell application "System Events"
-        tell (first application process whose frontmost is true)
-            set win to first window whose value of attribute "AXMain" is true
-            set chanName to name of win
-            try
-                set wa to first UI element of win whose role is "AXWebArea"
-                set msgTexts to flatten({wa})
-                set textOut to msgTexts as text
-            end try
-            return {chanName, textOut}
-        end tell
-    end tell
-    '''
+    script_path = os.path.join(os.path.dirname(__file__), 'slack_script.scpt')
     try:
         raw = subprocess.check_output(
-            ['osascript', '-ss', '-e', slack_script]
-        ).decode('utf-8', errors='ignore').split(', ', 1)
-        title = raw[0].strip()
-        body  = raw[1].strip() if len(raw) > 1 else ""
-        print(f"Slack title: {title}")
-        print(f"Slack body: {body}")
-        return title, body
+            ['osascript', script_path]
+        ).decode('utf-8', errors='ignore').strip()
+        
+        # Parse the JSON response
+        data = json.loads(raw)
+        
+        if 'error' in data:
+            print(f"Slack AppleScript error: {data['error']}")
+            return "", ""
+        
+        channel = data.get('channel', '')
+        conversation = data.get('conversation', '')
+        
+        print(f"Slack channel: {channel}")
+        print(f"Slack conversation length: {len(conversation)} chars")
+        return channel, conversation
+        
+    except json.JSONDecodeError as e:
+        print(f"Slack AppleScript returned invalid JSON: {e}")
+        return "", ""
     except Exception as e:
         print(f"Slack AppleScript failed: {e}")
         return "", ""
