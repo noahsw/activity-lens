@@ -50,49 +50,31 @@ def grab_browser_content():
             'osascript', '-e', 'tell application "System Events" to get name of first application process whose frontmost is true'
         ]).decode().strip()
         
-        title = ""
-        text = ""
+        script_path = None
         
-        # Extract title and text based on browser type
+        # Map app names to script files
         if app_name == "Arc":
-            title = subprocess.check_output([
-                'osascript', '-e', 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.title"'
-            ]).decode('utf-8', errors='ignore').strip()
-            text = subprocess.check_output([
-                'osascript', '-e', 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.body.innerText"'
-            ]).decode('utf-8', errors='ignore').strip()
+            script_path = os.path.join(os.path.dirname(__file__), 'arc_script.scpt')
         elif app_name == "Google Chrome":
-            title = subprocess.check_output([
-                'osascript', '-e', 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.title"'
-            ]).decode('utf-8', errors='ignore').strip()
-            text = subprocess.check_output([
-                'osascript', '-e', 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.body.innerText"'
-            ]).decode('utf-8', errors='ignore').strip()
+            script_path = os.path.join(os.path.dirname(__file__), 'chrome_script.scpt')
         elif app_name == "Safari":
-            title = subprocess.check_output([
-                'osascript', '-e', 'tell application "Safari" to do JavaScript "document.title" in current tab of front window'
-            ]).decode('utf-8', errors='ignore').strip()
-            text = subprocess.check_output([
-                'osascript', '-e', 'tell application "Safari" to do JavaScript "document.body.innerText" in current tab of front window'
-            ]).decode('utf-8', errors='ignore').strip()
+            script_path = os.path.join(os.path.dirname(__file__), 'safari_script.scpt')
         elif app_name == "Brave Browser":
-            title = subprocess.check_output([
-                'osascript', '-e', 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.title"'
-            ]).decode('utf-8', errors='ignore').strip()
-            text = subprocess.check_output([
-                'osascript', '-e', 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.body.innerText"'
-            ]).decode('utf-8', errors='ignore').strip()
+            script_path = os.path.join(os.path.dirname(__file__), 'brave_script.scpt')
         elif app_name == "Microsoft Edge":
-            title = subprocess.check_output([
-                'osascript', '-e', 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.title"'
-            ]).decode('utf-8', errors='ignore').strip()
-            text = subprocess.check_output([
-                'osascript', '-e', 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.body.innerText"'
-            ]).decode('utf-8', errors='ignore').strip()
+            script_path = os.path.join(os.path.dirname(__file__), 'edge_script.scpt')
         else:
             return "", ""  # Not a supported browser
         
-        return title, text
+        # Execute the appropriate script
+        raw = subprocess.check_output(['osascript', script_path]).decode('utf-8', errors='ignore').strip()
+        
+        # Split the result on the separator
+        if "|||" in raw:
+            title, text = raw.split("|||", 1)
+            return title.strip(), text.strip()
+        else:
+            return "", ""
         
     except Exception as e:
         print(f"Browser content extraction failed: {e}")
