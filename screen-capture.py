@@ -30,79 +30,88 @@ def append_metadata(entry: dict):
     with open(JSON_PATH, 'w', encoding='utf-8') as jf:
         json.dump(data, jf, indent=2, ensure_ascii=False)
 
-# Common browsers and their AppleScript JS execution commands
-browser_scripts = {
-    'Arc': 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.body.innerText"',
-    'Google Chrome': 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.body.innerText"',
-    'Safari': 'tell application "Safari" to do JavaScript "document.body.innerText" in current tab of front window',
-    'Brave Browser': 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.body.innerText"',
-    'Microsoft Edge': 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.body.innerText"',
-}
+# List of supported browsers
+browser_apps = ['Arc', 'Google Chrome', 'Safari', 'Brave Browser', 'Microsoft Edge']
 
 # -----------------------------------------------------------------------------
 # AppleScript-based visible text extraction (works without Accessibility bridge)
 # -----------------------------------------------------------------------------
 
 
-def grab_visible_text():
-    """Return visible text from the front-most window.
-
-    • If the frontmost app is a browser (Arc, Chrome, Safari, etc.) run
-      JavaScript `document.body.innerText` to get full page text.
-    • Otherwise fall back to getting every static-text value via System Events.
+def grab_browser_content():
+    """Return (title, text) from the front-most browser window.
+    
+    • If the frontmost app is a browser, extracts both title and text content.
+    • Otherwise returns empty strings.
     """
     try:
-        # Which application is frontmost?
-        app_name = subprocess.check_output(
-            ['osascript', '-e', 'tell application "System Events" to get name of first application process whose frontmost is true']
-        ).decode().strip()
+        # Get the frontmost app name
+        app_name = subprocess.check_output([
+            'osascript', '-e', 'tell application "System Events" to get name of first application process whose frontmost is true'
+        ]).decode().strip()
+        
+        title = ""
+        text = ""
+        
+        # Extract title and text based on browser type
+        if app_name == "Arc":
+            title = subprocess.check_output([
+                'osascript', '-e', 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.title"'
+            ]).decode('utf-8', errors='ignore').strip()
+            text = subprocess.check_output([
+                'osascript', '-e', 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.body.innerText"'
+            ]).decode('utf-8', errors='ignore').strip()
+        elif app_name == "Google Chrome":
+            title = subprocess.check_output([
+                'osascript', '-e', 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.title"'
+            ]).decode('utf-8', errors='ignore').strip()
+            text = subprocess.check_output([
+                'osascript', '-e', 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.body.innerText"'
+            ]).decode('utf-8', errors='ignore').strip()
+        elif app_name == "Safari":
+            title = subprocess.check_output([
+                'osascript', '-e', 'tell application "Safari" to do JavaScript "document.title" in current tab of front window'
+            ]).decode('utf-8', errors='ignore').strip()
+            text = subprocess.check_output([
+                'osascript', '-e', 'tell application "Safari" to do JavaScript "document.body.innerText" in current tab of front window'
+            ]).decode('utf-8', errors='ignore').strip()
+        elif app_name == "Brave Browser":
+            title = subprocess.check_output([
+                'osascript', '-e', 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.title"'
+            ]).decode('utf-8', errors='ignore').strip()
+            text = subprocess.check_output([
+                'osascript', '-e', 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.body.innerText"'
+            ]).decode('utf-8', errors='ignore').strip()
+        elif app_name == "Microsoft Edge":
+            title = subprocess.check_output([
+                'osascript', '-e', 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.title"'
+            ]).decode('utf-8', errors='ignore').strip()
+            text = subprocess.check_output([
+                'osascript', '-e', 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.body.innerText"'
+            ]).decode('utf-8', errors='ignore').strip()
+        else:
+            return "", ""  # Not a supported browser
+        
+        return title, text
+        
+    except Exception as e:
+        print(f"Browser content extraction failed: {e}")
+        return "", ""
 
-        if app_name in browser_scripts:
-            raw = subprocess.check_output(['osascript', '-e', browser_scripts[app_name]]).decode('utf-8', errors='ignore')
-            return raw.strip()
-
-        # Fallback: generic static-text extraction via Accessibility/System Events
+def grab_generic_text():
+    """Fallback function to get text from non-browser applications."""
+    try:
         static_text_script = (
             'tell application "System Events" to tell (first application process whose frontmost is true) '
             'to get value of every static text of windows'
         )
         raw = subprocess.check_output(['osascript', '-e', static_text_script]).decode('utf-8', errors='ignore')
         return raw.replace(', ', '\n').replace(', ', '\n').replace('\n', '\n').replace('\\n', '\n').strip()
-
     except subprocess.CalledProcessError as e:
-        print(f"Error in grab_visible_text: {e}")
+        print(f"Error in grab_generic_text: {e}")
         return ""
 
-def get_window_title():
-    """Return the window title.
 
-    • If the frontmost app is a browser, use JavaScript `document.title`.
-    • Otherwise return the window name via System Events.
-    """
-    try:
-        app_name = subprocess.check_output([
-            'osascript', '-e', 'tell application "System Events" to get name of first application process whose frontmost is true'
-        ]).decode().strip()
-
-        browser_title_scripts = {
-            'Arc': 'tell application "Arc" to tell front window\'s active tab to execute javascript "document.title"',
-            'Google Chrome': 'tell application "Google Chrome" to tell active tab of front window to execute javascript "document.title"',
-            'Safari': 'tell application "Safari" to do JavaScript "document.title" in current tab of front window',
-            'Brave Browser': 'tell application "Brave Browser" to tell active tab of front window to execute javascript "document.title"',
-            'Microsoft Edge': 'tell application "Microsoft Edge" to tell active tab of front window to execute javascript "document.title"',
-        }
-
-        if app_name in browser_title_scripts:
-            title = subprocess.check_output(['osascript', '-e', browser_title_scripts[app_name]]).decode().strip()
-            return title
-
-        title = subprocess.check_output([
-            'osascript',
-            '-e', 'tell application "System Events" to tell (first application process whose frontmost is true) to get name of front window'
-        ]).decode().strip()
-        return title
-    except Exception:
-        return ""
 
 def get_focused_window_rect():
     CGWindowListCopyWindowInfo = getattr(CG, 'CGWindowListCopyWindowInfo')
@@ -162,13 +171,13 @@ def capture_focused_window():
         raw_app_name, app_name = get_active_app_names()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         window_title, text = ("", "")
-        if app_name in browser_scripts:
-            text = grab_visible_text()
-            window_title = get_window_title()
-        elif app_name == "Slack":
-            window_title, text = slack_get_title_and_messages()
-        elif app_name == "zoom_us":
-            # Just record focus time; no file written
+        if raw_app_name in browser_apps:
+            window_title, text = grab_browser_content()
+        # Slack is disabled because it's too slow
+        # elif raw_app_name == "Slack":
+        #     window_title, text = slack_get_title_and_messages()
+        elif raw_app_name == "zoom_us":
+            # Just record focus time; no screenshot written
             metadata = {
                 'filename': None,
                 'app_name': app_name,
@@ -178,8 +187,15 @@ def capture_focused_window():
             append_metadata(metadata)
             return
         else:
-            text = grab_visible_text()
-            window_title = get_window_title()
+            text = grab_generic_text()
+            # For non-browser apps, try to get window title via System Events
+            try:
+                window_title = subprocess.check_output([
+                    'osascript',
+                    '-e', 'tell application "System Events" to tell (first application process whose frontmost is true) to get name of front window'
+                ]).decode().strip()
+            except Exception:
+                window_title = ""
 
         if text.strip():
             write_text_entry(app_name, timestamp, text, window_title)
