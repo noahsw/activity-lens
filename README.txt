@@ -55,7 +55,7 @@ This will create or overwrite `screen_captures_ocr.json` with OCR results for ea
 
   In another Terminal:
   ```sh
-  python summarize-contents.py
+  python analyze-screen-captures.py
   ```
 
 
