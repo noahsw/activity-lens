@@ -53,18 +53,18 @@ README
 ### 1. Extract OCR from Screenshots
 Extract text from all PNG screenshots in the `screen-captures/` directory and save the results to `screen_captures_ocr.json`:
 
-```sh
-python ocr_extract.py
-```
+  ```sh
+  python ocr_extract.py
+  ```
 
 This will create or overwrite `screen_captures_ocr.json` with OCR results for each image, including filename, app name, timestamp, and extracted text.
 
 ### 2. Classify OCR Entries
 Classify each entry in the OCR JSON using the precomputed centroids and FAISS index:
 
-```sh
-python classify_ocr_json.py
-```
+  ```sh
+  python classify_ocr_json.py
+  ```
 
 - This script loads `screen_captures_ocr.json`.
 - Uses `bucket_ids.npy` and `bucket_index.faiss` for classification.
