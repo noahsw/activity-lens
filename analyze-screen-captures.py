@@ -25,15 +25,19 @@ except (json.JSONDecodeError, FileNotFoundError) as e:
     exit()
 
 # Function to call Ollama for summarization
-def summarize_with_ollama(text_content):
+def summarize_with_ollama(text_content, app_name="", window_title=""):
     """Call Ollama API to summarize the given text."""
     try:
         # Load the prompt template
         with open(prompt_file, 'r', encoding='utf-8') as f:
             prompt_template = f.read().strip()
         
-        # Construct the full prompt
-        full_prompt = f"{prompt_template}:\n\n{text_content}"
+        # Construct the full prompt with context
+        context_info = f"Application: {app_name}"
+        if window_title:
+            context_info += f"\nWindow Title: {window_title}"
+        
+        full_prompt = f"{prompt_template}:\n\n{context_info}\n\nScreen Contents:\n{text_content}"
         
         # Call Ollama API
         response = requests.post(
@@ -43,10 +47,11 @@ def summarize_with_ollama(text_content):
                 'prompt': full_prompt,
                 'stream': False,
                 'options': {
-                    'num_ctx': 32768  # Set context window to 32k
+                    'num_ctx': 8192,  # Use 8k context window (more reasonable)
+                    'num_predict': 100  # Limit output length
                 }
             },
-            timeout=30
+            timeout=60  # Increase timeout
         )
         
         if response.status_code == 200:
@@ -136,7 +141,7 @@ for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
                 continue
             
             # Get summary from Ollama
-            summary = summarize_with_ollama(text_content)
+            summary = summarize_with_ollama(text_content, entry.get('app_name', ''), entry.get('window_title', ''))
             
             if summary:
                 print(f"  Summary: {summary}")
