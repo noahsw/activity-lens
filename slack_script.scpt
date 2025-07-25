@@ -1,6 +1,6 @@
 -- AppleScript to extract the visible conversation and channel name from the
 -- main Slack window and return it as a JSON object.
--- Final version based on UI hierarchy analysis.
+-- Final, highly optimized, and robust version for DMs and Channels.
 
 -- Helper function to escape characters for JSON compatibility.
 on escapeForJSON(theText)
@@ -61,13 +61,16 @@ end extractTextFrom
 
 -- Main script logic
 try
+	-- Start the timer
+	set startTime to current date
+	
 	-- Initialize variables with default values
 	set channelName to "unknown"
 	set chatText to ""
 	
 	tell application "Slack"
 		activate
-		delay 1 -- Give Slack a moment to become the frontmost application and render UI.
+		delay 0.1 -- Minimal delay for maximum speed.
 	end tell
 	
 	tell application "System Events"
@@ -75,7 +78,6 @@ try
 			-- Get the window name to extract the channel name.
 			try
 				set windowName to name of front window
-				-- Assumes window title format: "#channel-name - Workspace" or "User Name - Workspace"
 				set originalDelimiters to AppleScript's text item delimiters
 				set AppleScript's text item delimiters to " - "
 				set channelName to the first text item of windowName
@@ -87,43 +89,60 @@ try
 			-- Get the visible conversation text from the main scroll area.
 			set chatText to ""
 			try
-				-- New strategy: Search the entire window for the list element.
-				-- This can be slow, but is very robust against changes in nesting.
+				-- New High-Speed Strategy: Find a unique landmark (the message composer)
+				-- and use it to locate the message list. This is extremely fast.
 				set messageList to missing value
-				set allElements to entire contents of window 1
 				
-				repeat with anElement in allElements
-					try
-						if class of anElement is list then
-							set listDesc to description of anElement
-							if listDesc contains "direct message" or listDesc contains "channel" then
-								set messageList to anElement
-								exit repeat
+				-- Attempt 1 (Fastest & Most Reliable):
+				try
+					-- The message composer text area is a reliable, unique landmark.
+					set messageComposer to first text area of window 1 whose description starts with "Message to"
+					
+					-- The message list is usually a sibling of the composer's container. We go up two levels.
+					set parentContainer to container of container of messageComposer
+					
+					-- Now, find the list within that container.
+					set messageList to (first list of parentContainer whose description contains "direct message" or description contains "channel")
+				on error
+					-- If the fast method fails, fall back to the original full window scan.
+					set allElements to entire contents of window 1
+					repeat with anElement in allElements
+						try
+							if class of anElement is list then
+								set listDesc to description of anElement
+								if listDesc contains "direct message" or listDesc contains "channel" then
+									set messageList to anElement
+									exit repeat
+								end if
 							end if
-						end if
-					end try
-				end repeat
+						end try
+					end repeat
+				end try
 				
 				if messageList is missing value then
-					error "Could not find the main message list element after scanning the entire window."
+					error "Could not find the main message list after trying all known methods."
 				end if
 				
-				-- Once the list is found, recursively extract all text from it.
+				-- Use the reliable recursive function to extract text.
 				set chatText to my extractTextFrom(messageList)
 				
 			on error errMsg
-				-- If the targeted approach fails, provide a clear error.
+				-- If all approaches fail, provide a clear error.
 				set chatText to "Error: Could not extract text. The script failed with the following error: " & errMsg
 			end try
 		end tell
 	end tell
 	
+	-- Stop the timer and calculate the duration
+	set endTime to current date
+	set duration to endTime - startTime
+	
 	-- Escape the extracted text to ensure it's valid inside a JSON string.
 	set escapedChannel to my escapeForJSON(channelName)
 	set escapedChat to my escapeForJSON(chatText)
 	
-	-- Construct the final JSON string
-	set jsonString to "{\"channel\": \"" & escapedChannel & "\", \"conversation\": \"" & escapedChat & "\"}"
+	-- Construct the final JSON string.
+	set jsonString to "{\"channel\": \"" & escapedChannel & "\", \"conversation\": \"" & escapedChat & "\", \"execution_time_seconds\": " & duration & "}"
 	
 	-- Return the JSON string as the script's result.
 	return jsonString
