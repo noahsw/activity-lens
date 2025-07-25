@@ -41,7 +41,10 @@ def summarize_with_ollama(text_content):
             json={
                 'model': 'llama3.2',  # You can change this to your preferred model
                 'prompt': full_prompt,
-                'stream': False
+                'stream': False,
+                'options': {
+                    'num_ctx': 32768  # Set context window to 32k
+                }
             },
             timeout=30
         )
@@ -74,12 +77,15 @@ print(f"Found {len(entries_to_process)} entries to process")
 
 # Process each entry completely (OCR + summarization in one pass)
 for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
-    filename = entry['screen_capture_filename']
-    print(f"\nProcessing {idx}/{len(entries_to_process)}: {filename}")
+    # Get the appropriate filename for display
+    display_filename = entry.get('screen_capture_filename', entry.get('screen_text_filename', 'Unknown'))
+    print(f"\nProcessing {idx}/{len(entries_to_process)}: {display_filename}")
     
     # Step 1: OCR if needed
     if needs_ocr:
         print("  Step 1: Running OCR...")
+        filename = entry['screen_capture_filename']
+        
         filepath = os.path.join(input_dir, filename)
         
         # Check if the PNG file actually exists

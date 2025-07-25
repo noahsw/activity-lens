@@ -137,7 +137,7 @@ def write_text_entry(app_name, timestamp, text, window_title="", output_json=JSO
 
     # Build JSON metadata entry (no text_full to keep JSON small)
     entry = {
-        'screen_capture_filename': fname,
+        'screen_text_filename': fname,
         'app_name': app_name,
         'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
         'window_title': window_title
@@ -159,9 +159,8 @@ def capture_focused_window():
         # elif raw_app_name == "Slack":
         #     window_title, text = slack_get_title_and_messages()
         elif raw_app_name == "zoom_us":
-            # Just record focus time; no screenshot written
+            # Just record focus time; no file written
             metadata = {
-                'filename': None,
                 'app_name': app_name,
                 'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
                 'window_title': "Zoom Meeting"

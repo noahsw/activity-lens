@@ -47,7 +47,7 @@ Extract text from all PNG screenshots in the `screen-captures/` directory and sa
 
 This will create or overwrite `screen_captures_ocr.json` with OCR results for each image, including filename, app name, timestamp, and extracted text.
 
-3. Summarize text contents
+3. Analyze screen captures (OCR + Summarization):
   In one Terminal:
   ```sh
   ollama serve
@@ -57,6 +57,44 @@ This will create or overwrite `screen_captures_ocr.json` with OCR results for ea
   ```sh
   python analyze-screen-captures.py
   ```
+
+## Reset Options
+
+The `reset-analysis.py` script allows you to selectively remove analysis data to reprocess specific parts of the pipeline:
+
+### `--text-filename` vs `--text-files`:
+
+**`--text-filename`**
+- **Removes the JSON field**: Deletes the `"screen_text_filename"` field from entries in the JSON file
+- **Keeps the actual files**: The `.txt` files remain in the `screen-captures` directory
+- **Purpose**: Allows you to re-run OCR on entries that already have text files
+
+**`--text-files`** 
+- **Removes the actual files**: Deletes the `.txt` files from the `screen-captures` directory
+- **Keeps the JSON field**: The `"screen_text_filename"` field remains in the JSON
+- **Purpose**: Frees up disk space by removing the text files
+
+### Usage Examples:
+
+```bash
+# Remove only summary fields
+python reset-analysis.py --summary
+
+# Remove only text filename fields (keeps .txt files)
+python reset-analysis.py --text-filename
+
+# Remove only .txt files (keeps JSON fields)
+python reset-analysis.py --text-files
+
+# Remove all analysis data
+python reset-analysis.py --all
+
+# See what would be removed without doing it
+python reset-analysis.py --all --dry-run
+
+# Remove both summary and text filename fields
+python reset-analysis.py --summary --text-filename
+```
 
 
 
