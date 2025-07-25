@@ -10,47 +10,68 @@ CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 input_dir = os.path.join(CACHE_DIR, 'screen-captures')
 output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
 
-ocr_results = []
+# Load existing JSON data
+if not os.path.exists(output_json):
+    print(f"JSON file {output_json} not found. Nothing to process.")
+    exit()
 
-image_files = [f for f in sorted(os.listdir(input_dir)) if f.lower().endswith('.png')]
-total = len(image_files)
+try:
+    with open(output_json, 'r', encoding='utf-8') as f:
+        existing_data = json.load(f)
+except (json.JSONDecodeError, FileNotFoundError) as e:
+    print(f"Error reading JSON file: {e}")
+    exit()
 
-for idx, filename in enumerate(image_files, 1):
-    print(f"Processing {idx}/{total}: {filename}")
+# Find entries that don't have screen_text_filename (haven't been OCR'd yet)
+entries_to_process = []
+for entry in existing_data:
+    if 'screen_capture_filename' in entry and 'screen_text_filename' not in entry:
+        entries_to_process.append(entry)
+
+if not entries_to_process:
+    print("No new entries to process with OCR.")
+    exit()
+
+print(f"Found {len(entries_to_process)} entries to process with OCR")
+
+# Process each entry that needs OCR
+for idx, entry in enumerate(entries_to_process, 1):
+    filename = entry['screen_capture_filename']
+    print(f"Processing {idx}/{len(entries_to_process)}: {filename}")
+    
     filepath = os.path.join(input_dir, filename)
-    app_name = filename.split('_focused_window_')[0]
-    # Extract timestamp from filename using regex
-    match = re.search(r'(\d{8})[_]?(\d{6})', filename)
-    if match:
-        timestamp_str = match.group(1) + match.group(2)
-        try:
-            timestamp = datetime.strptime(timestamp_str, '%Y%m%d%H%M%S')
-            timestamp_iso = timestamp.isoformat()
-        except Exception:
-            timestamp_iso = None
-    else:
-        timestamp_iso = None
-    # OCR extraction
-    image = Image.open(filepath)
-    ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-    # Structure: list of lines, each line is a list of words
-    lines = {}
-    for i, text in enumerate(ocr_data['text']):
-        if text.strip():
-            line_num = ocr_data['line_num'][i]
-            if line_num not in lines:
-                lines[line_num] = []
-            lines[line_num].append(text)
-    structured_text = [' '.join(lines[k]) for k in sorted(lines.keys())]
-    ocr_results.append({
-        'filename': filename,
-        'app_name': app_name,
-        'timestamp': timestamp_iso,
-        'window_title': None,
-        'text_full': '\n'.join(structured_text)
-    })
-
-with open(output_json, 'w', encoding='utf-8') as f:
-    json.dump(ocr_results, f, indent=2, ensure_ascii=False)
+    
+    # Check if the PNG file actually exists
+    if not os.path.exists(filepath):
+        print(f"Warning: PNG file {filename} not found, skipping...")
+        continue
+    
+    try:
+        # OCR extraction
+        image = Image.open(filepath)
+        full_text = pytesseract.image_to_string(image)
+        
+        # Create text filename by replacing .png with .txt
+        text_filename = filename.replace('.png', '.txt')
+        text_filepath = os.path.join(input_dir, text_filename)
+        
+        # Save OCR text to separate .txt file
+        with open(text_filepath, 'w', encoding='utf-8') as tf:
+            tf.write(full_text.strip())
+        
+        print(f"OCR text saved to: {text_filename}")
+        
+        # Update the existing entry with the text filename
+        entry['screen_text_filename'] = text_filename
+        
+        # Save the updated JSON after each successful operation
+        with open(output_json, 'w', encoding='utf-8') as f:
+            json.dump(existing_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"Progress saved to {output_json}")
+        
+    except Exception as e:
+        print(f"Error processing {filename}: {e}")
+        continue
 
 print(f"OCR extraction complete. Results saved to {output_json}") 

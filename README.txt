@@ -10,7 +10,7 @@ README
    source venv/bin/activate
    ```
 
-2. **Install dependencies:**
+2. **Install Python dependencies:**
    ```sh
    pip install -r requirements.txt
    ```
@@ -20,37 +20,25 @@ README
    brew install tesseract
    ```
 
+4. **Install Ollama (required for text summarization):**
+   ```sh
+   brew install ollama
+   ```
+
 ## When changing buckets.yml
   ```sh
   python build-centroids.py
   ```
 
 
-## Run the Script
-
-- To capture the focused window every 5 seconds:
-  ```sh
-  python screen-capture.py
-  ```
-
-- To capture a single screenshot (edit the script to uncomment the relevant line):
-  ```sh
-  python screen-capture.py
-  ```
-
-# Activity Lens OCR & Classification
-
-## Requirements
-- Python 3.11.x (required for macOS accessibility APIs; see .python-version)
-- Install dependencies:
-  ```sh
-  pip install -r requirements.txt
-  ```
-- Ensure you have Tesseract OCR installed on your system for pytesseract to work.
-
 ## Usage
 
-### 1. Extract OCR from Screenshots
+1. Capture the focused window every 5 seconds:
+  ```sh
+  python screen-capture.py
+  ```
+
+2. Extract OCR from Screenshots
 Extract text from all PNG screenshots in the `screen-captures/` directory and save the results to `screen_captures_ocr.json`:
 
   ```sh
@@ -59,7 +47,21 @@ Extract text from all PNG screenshots in the `screen-captures/` directory and sa
 
 This will create or overwrite `screen_captures_ocr.json` with OCR results for each image, including filename, app name, timestamp, and extracted text.
 
-### 2. Classify OCR Entries
+3. Summarize text contents
+  In one Terminal:
+  ```sh
+  ollama serve
+  ```
+
+  In another Terminal:
+  ```sh
+  python summarize-contents.py
+  ```
+
+
+
+
+### Classify OCR Entries (still relevant?)
 Classify each entry in the OCR JSON using the precomputed centroids and FAISS index:
 
   ```sh
@@ -75,6 +77,3 @@ Classify each entry in the OCR JSON using the precomputed centroids and FAISS in
 ---
 
 For questions or issues, please refer to the code comments or open an issue.
-
-from Quartz import AXUIElementCreateApplication, AXUIElementCopyAttributeValue, kAXRoleAttribute, kAXChildrenAttribute, kAXValueAttribute
-

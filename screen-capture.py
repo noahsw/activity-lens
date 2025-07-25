@@ -137,7 +137,7 @@ def write_text_entry(app_name, timestamp, text, window_title="", output_json=JSO
 
     # Build JSON metadata entry (no text_full to keep JSON small)
     entry = {
-        'filename': fname,
+        'screen_capture_filename': fname,
         'app_name': app_name,
         'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
         'window_title': window_title
@@ -200,7 +200,7 @@ def capture_focused_window():
             print(f"Screenshot saved as: {filename}")
             # Write metadata to JSON for PNG capture
             entry = {
-                'filename': os.path.basename(filename),
+                'screen_capture_filename': os.path.basename(filename),
                 'app_name': app_name,
                 'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
                 'window_title': window_title
