@@ -1,6 +1,11 @@
-README
+# Activity Lens (macOS)
 
-# Focused Window Screenshot Script (macOS)
+Activity-Lens ingests screenshots, window titles, and OCR text, then:
+1. Classifies every event into customizable activity buckets (coding, email, browsing, shopping…).
+2. Aggregates time spent in each bucket with human-friendly charts & CSV exports.
+3. Generates daily narratives (“You spent 2 h 17 m coding in Cursor, 45 m shopping on Amazon…”).
+4. Runs locally — no data leaves your machine unless you choose to sync.
+5. Extensible via Python plug-ins: add new data sources (e.g., browser history) or analytics.
 
 ## Setup Instructions
 
@@ -25,20 +30,15 @@ README
    brew install ollama
    ```
 
-## When changing buckets.yml
-  ```sh
-  python build-centroids.py
-  ```
-
 
 ## Usage
 
-1. Capture the focused window every 5 seconds:
+1. **Capture the focused window every 5 seconds:**
   ```sh
   python screen-capture.py
   ```
 
-2. Analyze screen captures (OCR + Summarization):
+2. **Analyze screen captures (OCR + Summarization):**
   In one Terminal:
   ```sh
   ollama serve
@@ -49,7 +49,7 @@ README
   python analyze-screen-captures.py
   ```
 
-3. Paste the output of screen_captures_ocr.json into ChatGPT o3 and ask it to summarize my computer activity.
+3. **Paste the output of screen_captures_ocr.json into ChatGPT o3 and ask it to summarize my computer activity.**
 
 
 ## Reset Options

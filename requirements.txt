@@ -1,8 +1,5 @@
 pyautogui
 pillow
 pytesseract
-sentence-transformers
-faiss-cpu
-numpy
-pyyaml
-pandas
+requests
+pyobjc-framework-Quartz
