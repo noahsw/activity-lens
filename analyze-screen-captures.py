@@ -47,8 +47,9 @@ def summarize_with_ollama(text_content, app_name="", window_title=""):
                 'prompt': full_prompt,
                 'stream': False,
                 'options': {
-                    'num_ctx': 8192,  # Use 8k context window (more reasonable)
-                    'num_predict': 100  # Limit output length
+                    'num_ctx': 8192 * 2,  # Use 16k context window (more reasonable)
+                    'num_predict': 100, # Limit output length
+                    'temperature': 0
                 }
             },
             timeout=60  # Increase timeout

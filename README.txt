@@ -38,16 +38,7 @@ README
   python screen-capture.py
   ```
 
-2. Extract OCR from Screenshots
-Extract text from all PNG screenshots in the `screen-captures/` directory and save the results to `screen_captures_ocr.json`:
-
-  ```sh
-  python ocr_extract.py
-  ```
-
-This will create or overwrite `screen_captures_ocr.json` with OCR results for each image, including filename, app name, timestamp, and extracted text.
-
-3. Analyze screen captures (OCR + Summarization):
+2. Analyze screen captures (OCR + Summarization):
   In one Terminal:
   ```sh
   ollama serve
