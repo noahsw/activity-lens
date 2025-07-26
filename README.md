@@ -90,22 +90,6 @@ python reset-analysis.py --all --dry-run
 python reset-analysis.py --summary --text-filename
 ```
 
-
-
-
-### Classify OCR Entries (still relevant?)
-Classify each entry in the OCR JSON using the precomputed centroids and FAISS index:
-
-  ```sh
-  python classify_ocr_json.py
-  ```
-
-- This script loads `screen_captures_ocr.json`.
-- Uses `bucket_ids.npy` and `bucket_index.faiss` for classification.
-- Adds a `classification` field to each entry based on sentence embedding similarity.
-- **Updates the original `screen_captures_ocr.json` file inline** (no new file is created).
-- If an entry does not meet the similarity threshold, it will be marked as `"unclassified"`.
-
 ---
 
 For questions or issues, please refer to the code comments or open an issue.
