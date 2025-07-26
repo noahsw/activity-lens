@@ -49,6 +49,9 @@ README
   python analyze-screen-captures.py
   ```
 
+3. Paste the output of screen_captures_ocr.json into ChatGPT o3 and ask it to summarize my computer activity.
+
+
 ## Reset Options
 
 The `reset-analysis.py` script allows you to selectively remove analysis data to reprocess specific parts of the pipeline:

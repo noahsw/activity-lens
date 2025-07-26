@@ -1,10 +1,11 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from PIL import Image
 import pytesseract
 import re
 import requests
+import time
 
 # Paths
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
@@ -80,6 +81,19 @@ if not entries_to_process:
     exit()
 
 print(f"Found {len(entries_to_process)} entries to process")
+
+# Estimate processing time (rough estimates: OCR ~5s, summarization ~10s per entry)
+estimated_ocr_time = sum(1 for _, needs_ocr, _ in entries_to_process if needs_ocr) * 5
+estimated_summary_time = sum(1 for _, _, needs_summary in entries_to_process if needs_summary) * 10
+total_estimated_seconds = estimated_ocr_time + estimated_summary_time
+
+if total_estimated_seconds > 0:
+    estimated_time = timedelta(seconds=total_estimated_seconds)
+    print(f"Estimated processing time: {estimated_time}")
+    print(f"  - OCR operations: {sum(1 for _, needs_ocr, _ in entries_to_process if needs_ocr)} entries (~{timedelta(seconds=estimated_ocr_time)})")
+    print(f"  - Summarization operations: {sum(1 for _, _, needs_summary in entries_to_process if needs_summary)} entries (~{timedelta(seconds=estimated_summary_time)})")
+
+start_time = time.time()
 
 # Process each entry completely (OCR + summarization in one pass)
 for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
@@ -164,5 +178,15 @@ for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
         print(f"  Progress saved to {output_json}")
     except Exception as e:
         print(f"  Error saving progress: {e}")
+    
+    # Show progress and time remaining
+    elapsed_time = time.time() - start_time
+    avg_time_per_entry = elapsed_time / idx
+    remaining_entries = len(entries_to_process) - idx
+    estimated_remaining = timedelta(seconds=int(avg_time_per_entry * remaining_entries))
+    
+    print(f"  Progress: {idx}/{len(entries_to_process)} entries processed")
+    print(f"  Elapsed time: {timedelta(seconds=int(elapsed_time))}")
+    print(f"  Estimated time remaining: {estimated_remaining}")
 
-print("\nAnalysis complete!") 
+print(f"\nAnalysis complete! Total time: {timedelta(seconds=int(time.time() - start_time))}") 
