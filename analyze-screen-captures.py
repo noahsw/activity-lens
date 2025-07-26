@@ -6,12 +6,14 @@ import pytesseract
 import re
 import requests
 import time
+import hashlib
 
 # Paths
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 input_dir = os.path.join(CACHE_DIR, 'screen-captures')
 output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
 prompt_file = os.path.join(os.path.dirname(__file__), 'summarize_prompt.txt')
+summary_cache_file = os.path.join(CACHE_DIR, 'summary_cache.json')
 
 # Load existing JSON data
 if not os.path.exists(output_json):
@@ -25,9 +27,42 @@ except (json.JSONDecodeError, FileNotFoundError) as e:
     print(f"Error reading JSON file: {e}")
     exit()
 
+# Load summary cache
+def load_summary_cache():
+    """Load the summary cache from file."""
+    if os.path.exists(summary_cache_file):
+        try:
+            with open(summary_cache_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            return {}
+    return {}
+
+def save_summary_cache(cache):
+    """Save the summary cache to file."""
+    try:
+        with open(summary_cache_file, 'w', encoding='utf-8') as f:
+            json.dump(cache, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Warning: Could not save summary cache: {e}")
+
+def get_content_hash(text_content):
+    """Generate a hash for the text content."""
+    return hashlib.md5(text_content.encode('utf-8')).hexdigest()
+
+# Load the cache
+summary_cache = load_summary_cache()
+print(f"Loaded summary cache with {len(summary_cache)} entries")
+
 # Function to call Ollama for summarization
 def summarize_with_ollama(text_content, app_name="", window_title=""):
     """Call Ollama API to summarize the given text."""
+    # Check cache first
+    content_hash = get_content_hash(text_content)
+    if content_hash in summary_cache:
+        print(f"  Using cached summary (hash: {content_hash[:8]}...)")
+        return summary_cache[content_hash]
+    
     try:
         # Load the prompt template
         with open(prompt_file, 'r', encoding='utf-8') as f:
@@ -58,7 +93,13 @@ def summarize_with_ollama(text_content, app_name="", window_title=""):
         
         if response.status_code == 200:
             result = response.json()
-            return result.get('response', '').strip()
+            summary = result.get('response', '').strip()
+            
+            # Cache the result
+            summary_cache[content_hash] = summary
+            save_summary_cache(summary_cache)
+            
+            return summary
         else:
             print(f"Ollama API error: {response.status_code}")
             return None
