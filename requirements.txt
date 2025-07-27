@@ -3,3 +3,4 @@ pillow
 pytesseract
 requests
 pyobjc-framework-Quartz
+psutil
