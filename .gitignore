@@ -52,3 +52,10 @@ Thumbs.db
 # Cache directories
 .cache/
 .pytest_cache/
+
+# Test cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
