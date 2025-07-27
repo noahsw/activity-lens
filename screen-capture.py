@@ -5,6 +5,7 @@ import os
 import Quartz.CoreGraphics as CG
 import subprocess
 import json
+from PIL import Image
 
 # -----------------------------------------------------------------------------
 # Paths
@@ -32,6 +33,8 @@ def append_metadata(entry: dict):
 
 # List of supported browsers
 browser_apps = ['Arc', 'Google Chrome', 'Safari', 'Brave Browser', 'Microsoft Edge']
+
+
 
 # -----------------------------------------------------------------------------
 # AppleScript-based visible text extraction (works without Accessibility bridge)
@@ -185,18 +188,34 @@ def capture_focused_window():
         if len(text.strip()) < 10:
             text = ""
         if not text:
-            # Fallback to screenshot
+            # Fallback to optimized screenshot for OCR
             bounds = get_focused_window_rect()
             if not bounds:
                 print("No active window found or cannot get window geometry.")
                 return
-            screenshot = pyautogui.screenshot(region=(
-                int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height'])
-            ))
+            
+            # Capture high-resolution screenshot
+            region = (int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height']))
+            
+            # Capture focused window with simple optimization for OCR
+            image = pyautogui.screenshot(region=region)
+            
+            # Simple optimization: convert to grayscale for better OCR
+            if image.mode != 'L':
+                image = image.convert('L')
+            
+            # Save with optimized settings
             ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
             filename = os.path.join(SCREEN_DIR, f"{ts_readable} - {app_name}.png")
-            screenshot.save(filename)
+            
+            # Save with good quality PNG settings
+            image.save(filename, 'PNG')
+            
+            # Get file size
+            file_size_kb = os.path.getsize(filename) / 1024
+            
             print(f"Screenshot saved as: {filename}")
+            print(f"  Image: {image.size} | Mode: {image.mode} | File size: {file_size_kb:.1f} KB")
             # Write metadata to JSON for PNG capture
             entry = {
                 'screen_capture_filename': os.path.basename(filename),
@@ -218,9 +237,11 @@ def capture_focused_window_continuous(interval=5):
     """
     print(f"Starting continuous capture every {interval} seconds...")
     print("Press Ctrl+C to stop")
+    print("💤 Your Mac can sleep normally - this script won't prevent it")
     try:
         while True:
             capture_focused_window()
+            # Use time.sleep which allows the system to sleep
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\nCapture stopped by user")

@@ -12,7 +12,7 @@ import hashlib
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 input_dir = os.path.join(CACHE_DIR, 'screen-captures')
 output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
-prompt_file = os.path.join(os.path.dirname(__file__), 'summarize_prompt.txt')
+prompt_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summarize_prompt.txt')
 summary_cache_file = os.path.join(CACHE_DIR, 'summary_cache.json')
 
 # Load existing JSON data
@@ -141,6 +141,7 @@ for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
     # Get the appropriate filename for display
     display_filename = entry.get('screen_capture_filename', entry.get('screen_text_filename', 'Unknown'))
     print(f"\nProcessing {idx}/{len(entries_to_process)}: {display_filename}")
+    print(f"  Needs OCR: {needs_ocr} | Needs Summary: {needs_summary}")
     
     # Step 1: OCR if needed
     if needs_ocr:
@@ -155,9 +156,24 @@ for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
             continue
         
         try:
-            # OCR extraction
+            # Import and use pytesseract directly with optimized settings
+            from PIL import Image
+            import pytesseract
+            
+            # Load and optimize image for OCR
             image = Image.open(filepath)
-            full_text = pytesseract.image_to_string(image)
+            
+            # Convert to grayscale for better OCR
+            if image.mode != 'L':
+                image = image.convert('L')
+            
+            # Use pytesseract with optimized settings for maximum accuracy
+            full_text = pytesseract.image_to_string(
+                image, 
+                config='--psm 6 --oem 3 --dpi 600'
+            )
+            
+            print(f"  OCR completed: {len(full_text)} characters extracted")
             
             # Create text filename by replacing .png with .txt
             text_filename = filename.replace('.png', '.txt')
@@ -175,6 +191,11 @@ for idx, (entry, needs_ocr, needs_summary) in enumerate(entries_to_process, 1):
         except Exception as e:
             print(f"  Error during OCR: {e}")
             continue
+    
+    # Re-evaluate if summarization is needed (in case OCR just created the text file)
+    if not needs_summary and 'screen_text_filename' in entry and 'summary' not in entry:
+        needs_summary = True
+        print(f"  Updated: Now needs summarization (OCR created text file)")
     
     # Step 2: Summarization if needed
     if needs_summary:
