@@ -1,0 +1,1 @@
+Describe what the user is doing based on the following screen contents in 10 words and don't include these instructions in the output. Max out at 10 words.

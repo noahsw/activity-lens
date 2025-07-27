@@ -12,7 +12,7 @@ import hashlib
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
 input_dir = os.path.join(CACHE_DIR, 'screen-captures')
 output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
-prompt_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summarize_prompt.txt')
+prompt_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summarize_screen_text_prompt.txt')
 summary_cache_file = os.path.join(CACHE_DIR, 'summary_cache.json')
 
 # Load existing JSON data
