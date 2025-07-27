@@ -53,7 +53,16 @@ Activity-Lens ingests screenshots, window titles, and OCR text, then:
   python analyze-screen-captures.py
   ```
 
-3. **Paste the output of screen_captures_ocr.json into ChatGPT o3 and ask it to summarize my computer activity.**
+3. **Analyze your activity patterns and get AI outsourcing suggestions:**
+   ```sh
+   python prepare_activity_analysis.py
+   ```
+   This will:
+   - Load your activity data and analysis prompt
+   - Format it for LLM analysis
+   - Copy everything to your clipboard
+   - Provide instructions for pasting into ChatGPT, Claude, or other LLMs
+   - Get insights on time usage and AI outsourcing opportunities
 
 
 ## Reset Options
@@ -93,6 +102,54 @@ python reset-analysis.py --all --dry-run
 # Remove both summary and text filename fields
 python reset-analysis.py --summary --text-filename
 ```
+
+## Activity Analysis & AI Outsourcing
+
+### **Automated Activity Analysis**
+The `prepare_activity_analysis.py` script provides a streamlined way to analyze your computer activity patterns and identify AI outsourcing opportunities:
+
+**What it does:**
+- 📊 **Loads your activity data** from screen captures and summaries
+- 📝 **Applies analysis prompt** designed for productivity insights
+- 📋 **Formats for LLM consumption** with clean, structured data
+- 🎯 **Copies to clipboard** for easy pasting into any LLM
+- 📈 **Provides data summary** including token estimates
+
+**Sample output:**
+```
+🔍 Preparing Activity Analysis for LLM
+==================================================
+📝 Loading analysis prompt...
+📊 Loading activity data...
+   Found 85 activity entries
+📋 Formatting data...
+📋 Copying to clipboard...
+✅ Successfully copied to clipboard!
+
+🎯 Next Steps:
+1. Open your favorite LLM (ChatGPT, Claude, etc.)
+2. Paste the content (Cmd+V on Mac, Ctrl+V on Windows)
+3. Ask the LLM to analyze your activity patterns
+4. Get insights on time usage and AI outsourcing opportunities!
+
+📊 Data Summary:
+   - Total entries: 85
+   - Total characters: 14,150
+   - Estimated tokens: 3,537 (rough estimate)
+```
+
+**Analysis includes:**
+- ⏰ **Time tracking** - How much time spent on each activity
+- 🎯 **Theme identification** - Grouping activities into meaningful categories
+- 🤖 **AI outsourcing suggestions** - Low-ROI activities that could be automated
+- 📈 **Productivity insights** - Patterns and optimization opportunities
+
+### **Customizing Analysis**
+You can modify the analysis prompt in `analyze_activity_prompt.txt` to focus on specific aspects:
+- Time management patterns
+- Focus vs. distraction analysis
+- Project-specific productivity
+- Work-life balance insights
 
 ---
 
