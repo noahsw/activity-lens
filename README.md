@@ -9,9 +9,13 @@ Activity-Lens ingests screenshots, window titles, and OCR text, then:
 
 ## Setup Instructions
 
+**Prerequisites:**
+- Python 3.11 (recommended) - other versions may work but 3.11 is tested
+- Homebrew (for installing Tesseract and Ollama)
+
 1. **Create and activate a virtual environment:**
    ```sh
-   python3 -m venv venv
+   python3.11 -m venv venv
    source venv/bin/activate
    ```
 
