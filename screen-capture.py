@@ -31,8 +31,14 @@ def append_metadata(entry: dict):
     with open(JSON_PATH, 'w', encoding='utf-8') as jf:
         json.dump(data, jf, indent=2, ensure_ascii=False)
 
-# List of supported browsers
+# List of supported browsers (these will try text extraction first)
 browser_apps = ['Arc', 'Google Chrome', 'Safari', 'Brave Browser', 'Microsoft Edge']
+
+# List of apps where text extraction is likely to work well
+text_extraction_apps = ['Visual Studio Code', 'Sublime Text', 'Atom', 'TextEdit', 'Notes', 'Mail', 'Calendar', 'Reminders', 'Terminal', 'iTerm2']
+
+# List of apps that should only record metadata (no PNG capture, no text extraction)
+metadata_only_apps = ['zoom_us', 'FaceTime', 'Teams', 'Discord']
 
 
 
@@ -112,16 +118,36 @@ def get_focused_window_rect():
     return None
 
 def get_active_app_names():
-    """Return raw app name and sanitized version."""
+    """Return raw app name, sanitized version, and window title."""
     try:
-        raw_name = subprocess.check_output([
-            'osascript', '-e', 'tell application "System Events" to get name of first application process whose frontmost is true'
+        # Get both app name and window title in a single AppleScript call
+        # Using a simple separator for better performance
+        result = subprocess.check_output([
+            'osascript', '-e', 'tell application "System Events" to set frontApp to first application process whose frontmost is true' + '\n' +
+                             'set appName to name of frontApp' + '\n' +
+                             'try' + '\n' +
+                             '  set windowTitle to name of front window of frontApp' + '\n' +
+                             'on error' + '\n' +
+                             '  set windowTitle to ""' + '\n' +
+                             'end try' + '\n' +
+                             'return appName & "|||" & windowTitle'
         ]).decode().strip()
-    except Exception:
+        
+        # Parse the result using simple string split
+        if "|||" in result:
+            raw_name, window_title = result.split("|||", 1)
+        else:
+            raw_name = result
+            window_title = ""
+            
+    except Exception as e:
+        print(f"Error getting app info: {e}")
         raw_name = "UnknownApp"
+        window_title = ""
+    
     safe_name = "".join(c if c.isalnum() else "_" for c in raw_name)
-    print("Active app name:", safe_name)
-    return raw_name, safe_name
+    print("Active app name:", safe_name, "with window title:", window_title)
+    return raw_name, safe_name, window_title
 
 def write_text_entry(app_name, timestamp, text, window_title="", output_json=JSON_PATH):
     """Save text to a .txt file and write a metadata entry to JSON."""
@@ -153,40 +179,38 @@ def capture_focused_window():
     Tries to extract visible text from the AXTree. If unsuccessful, captures a screenshot of the currently focused window and saves it as PNG.
     """
     try:
-        raw_app_name, app_name = get_active_app_names()
+        raw_app_name, app_name, window_title = get_active_app_names()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        window_title, text = ("", "")
-        if raw_app_name in browser_apps:
-            window_title, text = grab_browser_content()
-        # Slack is disabled because it's too slow
-        # elif raw_app_name == "Slack":
-        #     window_title, text = slack_get_title_and_messages()
-        elif raw_app_name == "zoom_us":
-            # Just record focus time; no file written
+        text = ""
+        
+        # Check if this app should only record metadata (no PNG, no text)
+        if raw_app_name in metadata_only_apps:
+            print(f"Active app name: {app_name} with window title: {window_title}")
+            # Just record metadata; no file written
             metadata = {
                 'app_name': app_name,
                 'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
-                'window_title': "Zoom Meeting"
+                'window_title': window_title
             }
             append_metadata(metadata)
             return
-        else:
+        
+        # Try text extraction for browsers and apps where it's likely to work
+        if raw_app_name in browser_apps:
+            window_title, text = grab_browser_content()
+        elif raw_app_name in text_extraction_apps:
             text = grab_generic_text()
-            # For non-browser apps, try to get window title via System Events
-            try:
-                window_title = subprocess.check_output([
-                    'osascript',
-                    '-e', 'tell application "System Events" to tell (first application process whose frontmost is true) to get name of front window'
-                ]).decode().strip()
-            except Exception:
-                window_title = ""
+            # If extracted text length is insignificantly small, treat as no text
+            if len(text.strip()) < 10:
+                print(f"Warning: Text length is insignificantly small: {len(text.strip())}")
+                text = ""
+        else:
+            # For all other apps, skip text extraction and go straight to PNG
+            text = ""
 
         if text.strip():
             write_text_entry(app_name, timestamp, text, window_title)
             return
-        # If extracted text length is insignificantly small, treat as no text
-        if len(text.strip()) < 10:
-            text = ""
         if not text:
             # Fallback to optimized screenshot for OCR
             bounds = get_focused_window_rect()
