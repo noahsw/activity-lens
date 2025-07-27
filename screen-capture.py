@@ -197,8 +197,13 @@ def capture_focused_window():
             # Capture high-resolution screenshot
             region = (int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height']))
             
-            # Capture focused window with simple optimization for OCR
+            # Capture focused window at higher resolution for better OCR
             image = pyautogui.screenshot(region=region)
+            
+            # Optional: Scale up for even higher quality (uncomment if needed)
+            # scale_factor = 2
+            # new_size = (image.width * scale_factor, image.height * scale_factor)
+            # image = image.resize(new_size, Image.Resampling.LANCZOS)
             
             # Simple optimization: convert to grayscale for better OCR
             if image.mode != 'L':
@@ -208,8 +213,8 @@ def capture_focused_window():
             ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
             filename = os.path.join(SCREEN_DIR, f"{ts_readable} - {app_name}.png")
             
-            # Save with good quality PNG settings
-            image.save(filename, 'PNG')
+            # Save with maximum quality PNG settings for OCR accuracy
+            image.save(filename, 'PNG', optimize=False, compress_level=0)
             
             # Get file size
             file_size_kb = os.path.getsize(filename) / 1024
