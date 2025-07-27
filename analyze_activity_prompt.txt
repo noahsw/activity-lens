@@ -1,0 +1,1 @@
+Analyze my computer activity based on the following log. Tell me how much time I'm spending on each theme. Make suggestions for where I should explore outsourcing some of this work to AI, based on low ROI activities (where I'm spending a lot of my time and an AI could likely do the job) 
