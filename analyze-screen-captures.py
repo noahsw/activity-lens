@@ -36,11 +36,24 @@ def load_summary_cache():
                 return json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             return {}
+    else:
+        # Create empty cache file if it doesn't exist
+        try:
+            # Ensure cache directory exists
+            os.makedirs(os.path.dirname(summary_cache_file), exist_ok=True)
+            # Create empty cache file
+            with open(summary_cache_file, 'w', encoding='utf-8') as f:
+                json.dump({}, f)
+            print(f"Created new summary cache file: {summary_cache_file}")
+        except Exception as e:
+            print(f"Warning: Could not create summary cache file: {e}")
     return {}
 
 def save_summary_cache(cache):
     """Save the summary cache to file."""
     try:
+        # Ensure cache directory exists
+        os.makedirs(os.path.dirname(summary_cache_file), exist_ok=True)
         with open(summary_cache_file, 'w', encoding='utf-8') as f:
             json.dump(cache, f, indent=2, ensure_ascii=False)
     except Exception as e:

@@ -58,7 +58,18 @@ def load_summary_cache():
         with open(summary_cache_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        return {}
+        # Create empty cache file if it doesn't exist
+        try:
+            # Ensure cache directory exists
+            os.makedirs(os.path.dirname(summary_cache_file), exist_ok=True)
+            # Create empty cache file
+            with open(summary_cache_file, 'w', encoding='utf-8') as f:
+                json.dump({}, f)
+            print(f"Created new summary cache file: {summary_cache_file}")
+            return {}
+        except Exception as e:
+            print(f"Warning: Could not create summary cache file: {e}")
+            return {}
     except json.JSONDecodeError as e:
         print(f"Warning: Corrupted summary cache file, starting fresh: {e}")
         # Backup the corrupted file
@@ -75,6 +86,8 @@ def save_summary_cache(cache):
     """Thread-safe function to save summary cache."""
     with SAVE_LOCK:
         try:
+            # Ensure cache directory exists
+            os.makedirs(os.path.dirname(summary_cache_file), exist_ok=True)
             with open(summary_cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache, f, indent=2, ensure_ascii=False)
         except Exception as e:
