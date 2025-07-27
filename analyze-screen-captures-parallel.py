@@ -111,10 +111,12 @@ def check_memory_usage():
     
     try:
         memory = psutil.virtual_memory()
-        if memory.percent > 90:
-            print(f"⚠️  High memory usage: {memory.percent:.1f}%")
+        if memory.percent > 95:  # Only stop at 95% (much more reasonable)
+            print(f"⚠️  Very high memory usage: {memory.percent:.1f}%")
             return False
-        elif memory.percent > 80:
+        elif memory.percent > 85:
+            print(f"⚠️  High memory usage: {memory.percent:.1f}%")
+        elif memory.percent > 75:
             print(f"⚠️  Elevated memory usage: {memory.percent:.1f}%")
         return True
     except Exception:
