@@ -14,8 +14,17 @@ from datetime import datetime
 
 # Import the module to test
 import importlib.util
-spec = importlib.util.spec_from_file_location("prepare_activity_analysis", "prepare_activity_analysis.py")
+import os
+import sys
+
+# Get the absolute path to the prepare_activity_analysis.py file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+prepare_activity_analysis_path = os.path.join(current_dir, "prepare_activity_analysis.py")
+
+# Load the module and register it in sys.modules
+spec = importlib.util.spec_from_file_location("prepare_activity_analysis", prepare_activity_analysis_path)
 prepare_activity_analysis = importlib.util.module_from_spec(spec)
+sys.modules["prepare_activity_analysis"] = prepare_activity_analysis
 spec.loader.exec_module(prepare_activity_analysis)
 
 class TestPrepareActivityAnalysis(unittest.TestCase):
@@ -39,13 +48,13 @@ class TestPrepareActivityAnalysis(unittest.TestCase):
                 'app_name': 'Cursor',
                 'timestamp': '2024-01-01T12:00:00',
                 'window_title': 'test.py - activity-lens',
-                'summary': 'Working on Python code'
+                'activity_summary': 'Working on Python code'
             },
             {
                 'app_name': 'Google Chrome',
                 'timestamp': '2024-01-01T12:05:00',
                 'window_title': 'GitHub - username/repo',
-                'summary': 'Browsing GitHub repository'
+                'activity_summary': 'Browsing GitHub repository'
             },
             {
                 'app_name': 'zoom_us',
@@ -127,69 +136,54 @@ class TestPrepareActivityAnalysis(unittest.TestCase):
         
         self.assertIsNone(data)
     
-    def test_format_activity_data_with_summaries(self):
+    def test_format_activity_data_csv_with_summaries(self):
         """Test formatting activity data with summaries."""
-        formatted = prepare_activity_analysis.format_activity_data(self.sample_activity_data)
+        formatted = prepare_activity_analysis.format_activity_data_csv(self.sample_activity_data)
         
-        # Check that all entries are formatted
-        self.assertIn('Time: 2024-01-01T12:00:00', formatted)
-        self.assertIn('App: Cursor', formatted)
-        self.assertIn('Window: test.py - activity-lens', formatted)
-        self.assertIn('Activity: Working on Python code', formatted)
+        # Check that CSV format is correct
+        self.assertIn('Timestamp,App Name,Window Title,Activity Summary', formatted)
         
-        self.assertIn('Time: 2024-01-01T12:05:00', formatted)
-        self.assertIn('App: Google Chrome', formatted)
-        self.assertIn('Window: GitHub - username/repo', formatted)
-        self.assertIn('Activity: Browsing GitHub repository', formatted)
+        # Check that all entries are formatted as CSV
+        self.assertIn('"2024-01-01T12:00:00","Cursor","test.py - activity-lens","Working on Python code"', formatted)
+        self.assertIn('"2024-01-01T12:05:00","Google Chrome","GitHub - username/repo","Browsing GitHub repository"', formatted)
         
-        # Check that entries without summaries are handled
-        self.assertIn('Time: 2024-01-01T12:10:00', formatted)
-        self.assertIn('App: zoom_us', formatted)
-        self.assertIn('Window: Team Meeting', formatted)
-        # The zoom_us entry doesn't have a summary, so it shouldn't have an Activity line
-        # Check that the zoom_us section doesn't contain an Activity line
+        # Check that entries without summaries are handled (empty field)
+        self.assertIn('"2024-01-01T12:10:00","zoom_us","Team Meeting",', formatted)
+        
+        # Verify CSV structure
         lines = formatted.split('\n')
-        zoom_us_section = False
-        zoom_us_has_activity = False
-        for line in lines:
-            if 'App: zoom_us' in line:
-                zoom_us_section = True
-            elif '---' in line:
-                zoom_us_section = False
-            elif zoom_us_section and line.startswith('Activity:'):
-                zoom_us_has_activity = True
-                break
-        
-        self.assertFalse(zoom_us_has_activity, "zoom_us entry should not have an Activity line")
+        self.assertEqual(len(lines), 4)  # Header + 3 data rows
+        self.assertTrue(lines[0].startswith('Timestamp,App Name,Window Title,Activity Summary'))
     
-    def test_format_activity_data_empty(self):
+    def test_format_activity_data_csv_empty(self):
         """Test formatting empty activity data."""
-        formatted = prepare_activity_analysis.format_activity_data([])
+        formatted = prepare_activity_analysis.format_activity_data_csv([])
         
         self.assertEqual(formatted, "No activity data available.")
     
-    def test_format_activity_data_none(self):
+    def test_format_activity_data_csv_none(self):
         """Test formatting None activity data."""
-        formatted = prepare_activity_analysis.format_activity_data(None)
+        formatted = prepare_activity_analysis.format_activity_data_csv(None)
         
         self.assertEqual(formatted, "No activity data available.")
     
-    def test_format_activity_data_missing_fields(self):
+    def test_format_activity_data_csv_missing_fields(self):
         """Test formatting activity data with missing fields."""
         incomplete_data = [
             {
                 'app_name': 'TestApp',
                 'timestamp': '2024-01-01T12:00:00'
-                # Missing window_title and summary
+                # Missing window_title and activity_summary
             }
         ]
         
-        formatted = prepare_activity_analysis.format_activity_data(incomplete_data)
+        formatted = prepare_activity_analysis.format_activity_data_csv(incomplete_data)
         
-        self.assertIn('Time: 2024-01-01T12:00:00', formatted)
-        self.assertIn('App: TestApp', formatted)
-        self.assertNotIn('Window:', formatted)
-        self.assertNotIn('Activity:', formatted)
+        self.assertIn('"2024-01-01T12:00:00","TestApp",,', formatted)
+        # Check that missing fields result in empty CSV fields
+        lines = formatted.split('\n')
+        self.assertEqual(len(lines), 2)  # Header + 1 data row
+        self.assertTrue(lines[0].startswith('Timestamp,App Name,Window Title,Activity Summary'))
     
     @patch('prepare_activity_analysis.pyperclip.copy')
     @patch('prepare_activity_analysis.pyperclip.paste')
@@ -254,10 +248,10 @@ class TestPrepareActivityAnalysis(unittest.TestCase):
                 'app_name': f'App{i}',
                 'timestamp': f'2024-01-01T12:{i:02d}:00',
                 'window_title': f'Window {i}',
-                'summary': f'Summary for activity {i}'
+                'activity_summary': f'Summary for activity {i}'
             })
         
-        formatted = prepare_activity_analysis.format_activity_data(large_data)
+        formatted = prepare_activity_analysis.format_activity_data_csv(large_data)
         full_text = f"{self.sample_prompt}\n\n{formatted}"
         
         # Check that the text is reasonably sized
@@ -276,7 +270,7 @@ class TestPrepareActivityAnalysis(unittest.TestCase):
                 'app_name': 'TestApp',
                 'timestamp': '2024-01-01T12:00:00',
                 'window_title': 'Test Window',
-                'summary': 'Test Summary'
+                'activity_summary': 'Test Summary'
             },
             # Entry without summary
             {
@@ -288,11 +282,11 @@ class TestPrepareActivityAnalysis(unittest.TestCase):
             {
                 'app_name': 'TestApp3',
                 'timestamp': '2024-01-01T12:02:00',
-                'summary': 'Test Summary 3'
+                'activity_summary': 'Test Summary 3'
             }
         ]
         
-        formatted = prepare_activity_analysis.format_activity_data(test_cases)
+        formatted = prepare_activity_analysis.format_activity_data_csv(test_cases)
         
         # Check that all entries are included
         self.assertIn('TestApp', formatted)

@@ -13,10 +13,7 @@ from unittest.mock import patch, MagicMock, mock_open
 from datetime import datetime
 
 # Import the module to test
-import importlib.util
-spec = importlib.util.spec_from_file_location("analyze_screen_captures_parallel", "analyze-screen-captures-parallel.py")
-analyze_screen_captures_parallel = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(analyze_screen_captures_parallel)
+import analyze_screen_captures_parallel
 
 class TestAnalyzeScreenCapturesParallel(unittest.TestCase):
     """Test cases for parallel screen capture analysis functionality."""

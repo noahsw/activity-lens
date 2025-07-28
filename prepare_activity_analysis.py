@@ -44,32 +44,53 @@ def load_activity_data():
         print(f"❌ Error loading activity data: {e}")
         return None
 
-def format_activity_data(data):
-    """Format the activity data for LLM analysis."""
+def format_activity_data_csv(data):
+    """Format the activity data as CSV for LLM analysis."""
     if not data:
         return "No activity data available."
     
-    formatted_entries = []
+    # CSV header
+    csv_lines = ['Timestamp,App Name,Window Title,Activity Summary']
     
     for entry in data:
         # Extract key information
         timestamp = entry.get('timestamp', 'Unknown time')
         app_name = entry.get('app_name', 'Unknown app')
         window_title = entry.get('window_title', '')
-        summary = entry.get('summary', '')
+        summary = entry.get('activity_summary', '')
         
-        # Format the entry
-        entry_text = f"Time: {timestamp}\nApp: {app_name}"
+        # Clean and escape CSV values for LLM parsing
+        def clean_csv_value(value):
+            if not value:
+                return ''
+            
+            # Convert to string and normalize whitespace
+            value = str(value).strip()
+            
+            # Replace problematic characters that might confuse LLMs
+            value = value.replace('\t', ' ')  # Replace tabs with spaces
+            value = value.replace('\r\n', ' ')  # Replace Windows line breaks
+            value = value.replace('\r', ' ')   # Replace Mac line breaks
+            value = value.replace('\n', ' ')   # Replace Unix line breaks
+            
+            # Escape quotes (standard CSV escaping)
+            value = value.replace('"', '""')
+            
+            # Always quote the field for consistency and easier LLM parsing
+            # This prevents issues with commas, quotes, or other special characters
+            return f'"{value}"'
         
-        if window_title:
-            entry_text += f"\nWindow: {window_title}"
+        # Format as CSV row
+        csv_row = [
+            clean_csv_value(timestamp),
+            clean_csv_value(app_name),
+            clean_csv_value(window_title),
+            clean_csv_value(summary)
+        ]
         
-        if summary:
-            entry_text += f"\nActivity: {summary}"
-        
-        formatted_entries.append(entry_text)
+        csv_lines.append(','.join(csv_row))
     
-    return "\n\n---\n\n".join(formatted_entries)
+    return '\n'.join(csv_lines)
 
 def copy_to_clipboard(text):
     """Copy text to clipboard and verify it worked."""
@@ -112,17 +133,22 @@ def main():
     
     print(f"   Found {len(activity_data)} activity entries")
     
-    # Format the data
-    print("📋 Formatting data...")
-    formatted_data = format_activity_data(activity_data)
+    # Format the data as CSV
+    print("📋 Formatting data as CSV...")
+    formatted_data = format_activity_data_csv(activity_data)
     
     # Combine prompt and data
     full_text = f"{prompt}\n\n{formatted_data}"
     
     # Show preview
-    print(f"\n📄 Preview (first 200 characters):")
+    print(f"\n📄 CSV Preview (first 3 rows):")
     print("-" * 50)
-    print(full_text[:200] + "..." if len(full_text) > 200 else full_text)
+    csv_lines = formatted_data.split('\n')
+    preview_lines = csv_lines[:4]  # Header + first 3 data rows
+    for line in preview_lines:
+        print(line)
+    if len(csv_lines) > 4:
+        print("...")
     print("-" * 50)
     
     # Copy to clipboard

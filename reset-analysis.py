@@ -22,7 +22,7 @@ def load_json():
     try:
         with open(output_json, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError) as e:
+    except (json.JSONDecodeError, FileNotFoundError, IsADirectoryError) as e:
         print(f"Error reading JSON file: {e}")
         return []
 
@@ -38,14 +38,14 @@ def save_json(data):
         return False
 
 def remove_summary_fields(data):
-    """Remove 'summary' field from all entries."""
+    """Remove 'activity_summary' field from all entries."""
     count = 0
     for entry in data:
-        if 'summary' in entry:
-            del entry['summary']
+        if 'activity_summary' in entry:
+            del entry['activity_summary']
             count += 1
     
-    print(f"Removed 'summary' field from {count} entries")
+    print(f"Removed 'activity_summary' field from {count} entries")
     return count
 
 def remove_text_filename_fields(data):
@@ -93,7 +93,7 @@ Examples:
     )
     
     parser.add_argument('--summary', action='store_true',
-                       help='Remove "summary" field from all entries')
+                       help='Remove "activity_summary" field from all entries')
     parser.add_argument('--text-filename', action='store_true',
                        help='Remove "screen_text_filename" field from entries')
     parser.add_argument('--text-files', action='store_true',
@@ -102,6 +102,8 @@ Examples:
                        help='Remove all analysis data (summary, text_filename, and text files)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Show what would be removed without actually doing it')
+    parser.add_argument('--force', action='store_true',
+                       help='Skip confirmation prompt (use with caution)')
     
     args = parser.parse_args()
     
@@ -123,7 +125,7 @@ Examples:
     text_files_count = 0
     
     if args.all or args.summary:
-        summary_count = sum(1 for entry in data if 'summary' in entry)
+        summary_count = sum(1 for entry in data if 'activity_summary' in entry)
     
     if args.all or args.text_filename:
         text_filename_count = sum(1 for entry in data if 'screen_text_filename' in entry and 'screen_capture_filename' in entry)
@@ -147,7 +149,7 @@ Examples:
         return
     
     # Confirm action
-    if not args.dry_run:
+    if not args.dry_run and not args.force:
         response = input("\nProceed? (y/N): ").strip().lower()
         if response not in ['y', 'yes']:
             print("Operation cancelled.")

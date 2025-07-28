@@ -14,6 +14,7 @@ import threading
 from PIL import Image
 import pytesseract
 import multiprocessing
+import requests
 
 # Try to import psutil, but make it optional
 try:
@@ -43,14 +44,8 @@ ocr_completed = 0
 summary_completed = 0
 start_time = None
 
-# Load existing JSON data
-try:
-    with open(output_json, 'r', encoding='utf-8') as f:
-        existing_data = json.load(f)
-    print(f"Loaded {len(existing_data)} existing entries from {output_json}")
-except FileNotFoundError:
-    existing_data = []
-    print(f"No existing data found, starting fresh")
+# Global variable for existing data (will be loaded in main function)
+existing_data = []
 
 # Load summary cache
 def load_summary_cache():
@@ -153,7 +148,6 @@ def get_content_hash(text_content):
 def check_ollama_status():
     """Check if Ollama is running and what models are available."""
     try:
-        import requests
         response = requests.get('http://localhost:11434/api/tags', timeout=5)
         if response.status_code == 200:
             models = response.json().get('models', [])
@@ -193,8 +187,6 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
     prompt = f"{prompt_template}:\n\n{context_info}\n\nScreen Contents:\n{text_content}"
     
     try:
-        import requests
-        
         # Use the model passed in (checked once at startup)
         if not model_to_use:
             print("  No model available, skipping summarization")
@@ -340,7 +332,7 @@ def process_summarization(entry, model_to_use=None):
                 print(f"  Summary for {text_filename}: {summary}")
                 
                 # Update the entry with the summary
-                entry['summary'] = summary
+                entry['activity_summary'] = summary
                 
                 # Update progress counter
                 with progress_lock:
@@ -356,202 +348,220 @@ def process_summarization(entry, model_to_use=None):
             print(f"  Error during summarization for {text_filename}: {e}")
             return entry, False
 
-# Find entries that need processing
-entries_to_process = []
-for entry in existing_data:
-    needs_ocr = 'screen_capture_filename' in entry and 'screen_text_filename' not in entry
-    needs_summary = 'screen_text_filename' in entry and 'summary' not in entry
+
+
+def main():
+    """Main execution function."""
+    global existing_data, start_time, ocr_completed, summary_completed
     
-    if needs_ocr or needs_summary:
-        entries_to_process.append((entry, needs_ocr, needs_summary))
+    # Load existing JSON data
+    try:
+        with open(output_json, 'r', encoding='utf-8') as f:
+            existing_data = json.load(f)
+        print(f"Loaded {len(existing_data)} existing entries from {output_json}")
+    except FileNotFoundError:
+        existing_data = []
+        print(f"No existing data found, starting fresh")
+    
+    # Find entries that need processing
+    entries_to_process = []
+    for entry in existing_data:
+        needs_ocr = 'screen_capture_filename' in entry and 'screen_text_filename' not in entry
+        needs_summary = 'screen_text_filename' in entry and 'activity_summary' not in entry
+        
+        if needs_ocr or needs_summary:
+            entries_to_process.append((entry, needs_ocr, needs_summary))
 
-if not entries_to_process:
-    print("No entries need processing.")
-    exit()
+    if not entries_to_process:
+        print("No entries need processing.")
+        return
 
-print(f"Found {len(entries_to_process)} entries to process")
+    print(f"Found {len(entries_to_process)} entries to process")
 
-# Count operations for time estimation
-ocr_entries = [(entry, needs_ocr, needs_summary) for entry, needs_ocr, needs_summary in entries_to_process if needs_ocr]
-summary_entries = [(entry, needs_ocr, needs_summary) for entry, needs_ocr, needs_summary in entries_to_process if needs_summary]
+    # Count operations for time estimation
+    ocr_entries = [(entry, needs_ocr, needs_summary) for entry, needs_ocr, needs_summary in entries_to_process if needs_ocr]
+    summary_entries = [(entry, needs_ocr, needs_summary) for entry, needs_ocr, needs_summary in entries_to_process if needs_summary]
 
-print(f"  - OCR operations: {len(ocr_entries)} entries")
-print(f"  - Summarization operations: {len(summary_entries)} entries")
-print(f"  - OCR workers: {MAX_OCR_WORKERS} (adaptive based on {multiprocessing.cpu_count()} CPU cores)")
-print(f"  - Summary workers: {MAX_SUMMARY_WORKERS}")
-print(f"  - Batch size: {BATCH_SIZE}")
+    print(f"  - OCR operations: {len(ocr_entries)} entries")
+    print(f"  - Summarization operations: {len(summary_entries)} entries")
+    print(f"  - OCR workers: {MAX_OCR_WORKERS} (adaptive based on {multiprocessing.cpu_count()} CPU cores)")
+    print(f"  - Summary workers: {MAX_SUMMARY_WORKERS}")
+    print(f"  - Batch size: {BATCH_SIZE}")
 
-# Check system resources
-print(f"\nSystem check:")
-if PSUTIL_AVAILABLE:
-    memory = psutil.virtual_memory()
-    print(f"  Memory: {memory.percent:.1f}% used ({memory.available / (1024**3):.1f} GB available)")
-else:
-    print(f"  Memory: Monitoring disabled (psutil not available)")
-cpu_count = multiprocessing.cpu_count()
-print(f"  CPU cores: {cpu_count}")
-
-# Check Ollama availability and select model once at startup
-selected_model = None
-if summary_entries:
-    print(f"\nChecking Ollama availability...")
-    available_models = check_ollama_status()
-    if not available_models:
-        print("⚠️  Ollama not available - summarization will be skipped")
-        print("   To enable summarization:")
-        print("   1. Install Ollama: https://ollama.ai")
-        print("   2. Pull a model: ollama pull llama3.2:3b")
-        print("   3. Start Ollama: ollama serve")
+    # Check system resources
+    print(f"\nSystem check:")
+    if PSUTIL_AVAILABLE:
+        memory = psutil.virtual_memory()
+        print(f"  Memory: {memory.percent:.1f}% used ({memory.available / (1024**3):.1f} GB available)")
     else:
-        # Try to find a suitable model
-        preferred_models = ['llama3.2:3b', 'llama3.2', 'llama3', 'llama2', 'mistral']
-        for preferred in preferred_models:
-            if any(preferred in model for model in available_models):
-                selected_model = preferred
-                break
-        
-        if not selected_model:
-            selected_model = available_models[0]  # Use first available model
-        
-        print(f"✓ Selected Ollama model: {selected_model}")
-        ollama_available = True
-else:
-    ollama_available = False
+        print(f"  Memory: Monitoring disabled (psutil not available)")
+    cpu_count = multiprocessing.cpu_count()
+    print(f"  CPU cores: {cpu_count}")
 
-start_time = time.time()
-
-# Phase 1: Parallel OCR processing
-if ocr_entries:
-    print(f"\n=== Phase 1: Parallel OCR Processing ===")
-    
-    # Process in batches to manage memory
-    for batch_start in range(0, len(ocr_entries), BATCH_SIZE):
-        batch_end = min(batch_start + BATCH_SIZE, len(ocr_entries))
-        batch = ocr_entries[batch_start:batch_end]
-        
-        print(f"\nProcessing OCR batch {batch_start//BATCH_SIZE + 1}/{(len(ocr_entries) + BATCH_SIZE - 1)//BATCH_SIZE}")
-        print(f"  Batch size: {len(batch)} entries")
-        
-        # Check memory before starting batch
-        if not check_memory_usage():
-            print("  ⚠️  High memory usage, waiting before continuing...")
-            time.sleep(5)
-        
-        with ThreadPoolExecutor(max_workers=MAX_OCR_WORKERS) as executor:
-            # Submit OCR tasks for this batch
-            future_to_entry = {}
-            for entry_tuple in batch:
-                entry, needs_ocr, needs_summary = entry_tuple
-                future = executor.submit(process_ocr, entry)
-                future_to_entry[future] = entry_tuple
+    # Check Ollama availability and select model once at startup
+    selected_model = None
+    if summary_entries:
+        print(f"\nChecking Ollama availability...")
+        available_models = check_ollama_status()
+        if not available_models:
+            print("⚠️  Ollama not available - summarization will be skipped")
+            print("   To enable summarization:")
+            print("   1. Install Ollama: https://ollama.ai")
+            print("   2. Pull a model: ollama pull llama3.2:3b")
+            print("   3. Start Ollama: ollama serve")
+        else:
+            # Try to find a suitable model
+            preferred_models = ['llama3.2:3b', 'llama3.2', 'llama3', 'llama2', 'mistral']
+            for preferred in preferred_models:
+                if any(preferred in model for model in available_models):
+                    selected_model = preferred
+                    break
             
-            # Process completed OCR tasks
-            for future in as_completed(future_to_entry):
-                entry_tuple = future_to_entry[future]
-                original_entry = entry_tuple[0]  # Get just the entry from the tuple
-                
-                try:
-                    updated_entry, success = future.result()
-                    
-                    # Update the entry in the main list
-                    for i, main_entry in enumerate(existing_data):
-                        if main_entry.get('screen_capture_filename') == updated_entry.get('screen_capture_filename'):
-                            existing_data[i] = updated_entry
-                            break
-                    
-                    if success:
-                        print(f"  ✓ OCR completed for {updated_entry.get('screen_capture_filename')}")
-                    else:
-                        print(f"  ✗ OCR failed for {updated_entry.get('screen_capture_filename')}")
-                    
-                    # Save progress after each OCR completion (thread-safe)
-                    save_progress_safe(existing_data)
-                    
-                    # Log progress
-                    log_progress("OCR", ocr_completed, len(ocr_entries), start_time)
-                        
-                except Exception as e:
-                    print(f"  ✗ OCR exception for {original_entry.get('screen_capture_filename')}: {e}")
-        
-        # Small delay between batches to allow memory cleanup
-        if batch_end < len(ocr_entries):
-            time.sleep(1)
-
-# Phase 2: Limited parallel summarization
-if summary_entries and ollama_available:
-    print(f"\n=== Phase 2: Limited Parallel Summarization ===")
-    
-    # Process in batches to manage memory and API load
-    for batch_start in range(0, len(summary_entries), BATCH_SIZE):
-        batch_end = min(batch_start + BATCH_SIZE, len(summary_entries))
-        batch = summary_entries[batch_start:batch_end]
-        
-        print(f"\nProcessing Summary batch {batch_start//BATCH_SIZE + 1}/{(len(summary_entries) + BATCH_SIZE - 1)//BATCH_SIZE}")
-        print(f"  Batch size: {len(batch)} entries")
-        
-        # Check memory before starting batch
-        if not check_memory_usage():
-            print("  ⚠️  High memory usage, waiting before continuing...")
-            time.sleep(5)
-        
-        with ThreadPoolExecutor(max_workers=MAX_SUMMARY_WORKERS) as executor:
-            # Submit summarization tasks for this batch
-            future_to_entry = {}
-            for entry_tuple in batch:
-                entry, needs_ocr, needs_summary = entry_tuple
-                future = executor.submit(process_summarization, entry, selected_model)
-                future_to_entry[future] = entry_tuple
+            if not selected_model:
+                selected_model = available_models[0]  # Use first available model
             
-            # Process completed summarization tasks
-            for future in as_completed(future_to_entry):
-                entry_tuple = future_to_entry[future]
-                original_entry = entry_tuple[0]  # Get just the entry from the tuple
-                
-                try:
-                    updated_entry, success = future.result()
-                    
-                    # Update the entry in the main list
-                    for i, main_entry in enumerate(existing_data):
-                        if main_entry.get('screen_text_filename') == updated_entry.get('screen_text_filename'):
-                            existing_data[i] = updated_entry
-                            break
-                    
-                    if success:
-                        print(f"  ✓ Summary completed for {updated_entry.get('screen_text_filename')}")
-                    else:
-                        print(f"  ✗ Summary failed for {updated_entry.get('screen_text_filename')}")
-                    
-                    # Save progress after each summary completion (thread-safe)
-                    save_progress_safe(existing_data)
-                    
-                    # Log progress
-                    log_progress("Summary", summary_completed, len(summary_entries), start_time)
-                        
-                except Exception as e:
-                    print(f"  ✗ Summary exception for {original_entry.get('screen_text_filename')}: {e}")
+            print(f"✓ Selected Ollama model: {selected_model}")
+            ollama_available = True
+    else:
+        ollama_available = False
+
+    start_time = time.time()
+
+    # Phase 1: Parallel OCR processing
+    if ocr_entries:
+        print(f"\n=== Phase 1: Parallel OCR Processing ===")
         
-        # Small delay between batches to allow memory cleanup and reduce API load
-        if batch_end < len(summary_entries):
-            time.sleep(2)
+        # Process in batches to manage memory
+        for batch_start in range(0, len(ocr_entries), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(ocr_entries))
+            batch = ocr_entries[batch_start:batch_end]
+            
+            print(f"\nProcessing OCR batch {batch_start//BATCH_SIZE + 1}/{(len(ocr_entries) + BATCH_SIZE - 1)//BATCH_SIZE}")
+            print(f"  Batch size: {len(batch)} entries")
+            
+            # Check memory before starting batch
+            if not check_memory_usage():
+                print("  ⚠️  High memory usage, waiting before continuing...")
+                time.sleep(5)
+            
+            with ThreadPoolExecutor(max_workers=MAX_OCR_WORKERS) as executor:
+                # Submit OCR tasks for this batch
+                future_to_entry = {}
+                for entry_tuple in batch:
+                    entry, needs_ocr, needs_summary = entry_tuple
+                    future = executor.submit(process_ocr, entry)
+                    future_to_entry[future] = entry_tuple
+                
+                # Process completed OCR tasks
+                for future in as_completed(future_to_entry):
+                    entry_tuple = future_to_entry[future]
+                    original_entry = entry_tuple[0]  # Get just the entry from the tuple
+                    
+                    try:
+                        updated_entry, success = future.result()
+                        
+                        # Update the entry in the main list
+                        for i, main_entry in enumerate(existing_data):
+                            if main_entry.get('screen_capture_filename') == updated_entry.get('screen_capture_filename'):
+                                existing_data[i] = updated_entry
+                                break
+                        
+                        if success:
+                            print(f"  ✓ OCR completed for {updated_entry.get('screen_capture_filename')}")
+                        else:
+                            print(f"  ✗ OCR failed for {updated_entry.get('screen_capture_filename')}")
+                        
+                        # Save progress after each OCR completion (thread-safe)
+                        save_progress_safe(existing_data)
+                        
+                        # Log progress
+                        log_progress("OCR", ocr_completed, len(ocr_entries), start_time)
+                            
+                    except Exception as e:
+                        print(f"  ✗ OCR exception for {original_entry.get('screen_capture_filename')}: {e}")
+            
+            # Small delay between batches to allow memory cleanup
+            if batch_end < len(ocr_entries):
+                time.sleep(1)
 
-# Save final results
-try:
-    with open(output_json, 'w', encoding='utf-8') as f:
-        json.dump(existing_data, f, indent=2, ensure_ascii=False)
-    print(f"\n✓ Results saved to {output_json}")
-except Exception as e:
-    print(f"\n✗ Error saving results: {e}")
+    # Phase 2: Limited parallel summarization
+    if summary_entries and ollama_available:
+        print(f"\n=== Phase 2: Limited Parallel Summarization ===")
+        
+        # Process in batches to manage memory and API load
+        for batch_start in range(0, len(summary_entries), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(summary_entries))
+            batch = summary_entries[batch_start:batch_end]
+            
+            print(f"\nProcessing Summary batch {batch_start//BATCH_SIZE + 1}/{(len(summary_entries) + BATCH_SIZE - 1)//BATCH_SIZE}")
+            print(f"  Batch size: {len(batch)} entries")
+            
+            # Check memory before starting batch
+            if not check_memory_usage():
+                print("  ⚠️  High memory usage, waiting before continuing...")
+                time.sleep(5)
+            
+            with ThreadPoolExecutor(max_workers=MAX_SUMMARY_WORKERS) as executor:
+                # Submit summarization tasks for this batch
+                future_to_entry = {}
+                for entry_tuple in batch:
+                    entry, needs_ocr, needs_summary = entry_tuple
+                    future = executor.submit(process_summarization, entry, selected_model)
+                    future_to_entry[future] = entry_tuple
+                
+                # Process completed summarization tasks
+                for future in as_completed(future_to_entry):
+                    entry_tuple = future_to_entry[future]
+                    original_entry = entry_tuple[0]  # Get just the entry from the tuple
+                    
+                    try:
+                        updated_entry, success = future.result()
+                        
+                        # Update the entry in the main list
+                        for i, main_entry in enumerate(existing_data):
+                            if main_entry.get('screen_text_filename') == updated_entry.get('screen_text_filename'):
+                                existing_data[i] = updated_entry
+                                break
+                        
+                        if success:
+                            print(f"  ✓ Summary completed for {updated_entry.get('screen_text_filename')}")
+                        else:
+                            print(f"  ✗ Summary failed for {updated_entry.get('screen_text_filename')}")
+                        
+                        # Save progress after each summary completion (thread-safe)
+                        save_progress_safe(existing_data)
+                        
+                        # Log progress
+                        log_progress("Summary", summary_completed, len(summary_entries), start_time)
+                            
+                    except Exception as e:
+                        print(f"  ✗ Summary exception for {original_entry.get('screen_text_filename')}: {e}")
+            
+            # Small delay between batches to allow memory cleanup and reduce API load
+            if batch_end < len(summary_entries):
+                time.sleep(2)
 
-total_time = time.time() - start_time
-print(f"\n=== Analysis Complete ===")
-print(f"Total time: {timedelta(seconds=int(total_time))}")
-print(f"Average time per entry: {total_time/len(entries_to_process):.2f}s")
-print(f"OCR completed: {ocr_completed}/{len(ocr_entries) if ocr_entries else 0}")
-print(f"Summaries completed: {summary_completed}/{len(summary_entries) if summary_entries else 0}")
+    # Save final results
+    try:
+        with open(output_json, 'w', encoding='utf-8') as f:
+            json.dump(existing_data, f, indent=2, ensure_ascii=False)
+        print(f"\n✓ Results saved to {output_json}")
+    except Exception as e:
+        print(f"\n✗ Error saving results: {e}")
 
-# Final system check
-if PSUTIL_AVAILABLE:
-    final_memory = psutil.virtual_memory()
-    print(f"Final memory usage: {final_memory.percent:.1f}%")
-else:
-    print("Final memory usage: Monitoring disabled") 
+    total_time = time.time() - start_time
+    print(f"\n=== Analysis Complete ===")
+    print(f"Total time: {timedelta(seconds=int(total_time))}")
+    print(f"Average time per entry: {total_time/len(entries_to_process):.2f}s")
+    print(f"OCR completed: {ocr_completed}/{len(ocr_entries) if ocr_entries else 0}")
+    print(f"Summaries completed: {summary_completed}/{len(summary_entries) if summary_entries else 0}")
+
+    # Final system check
+    if PSUTIL_AVAILABLE:
+        final_memory = psutil.virtual_memory()
+        print(f"Final memory usage: {final_memory.percent:.1f}%")
+    else:
+        print("Final memory usage: Monitoring disabled")
+
+if __name__ == '__main__':
+    main() 

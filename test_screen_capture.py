@@ -13,10 +13,7 @@ from unittest.mock import patch, MagicMock, mock_open
 from datetime import datetime
 
 # Import the module to test
-import importlib.util
-spec = importlib.util.spec_from_file_location("screen_capture", "screen-capture.py")
-screen_capture = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(screen_capture)
+import screen_capture
 
 class TestScreenCapture(unittest.TestCase):
     """Test cases for screen capture functionality."""
@@ -191,6 +188,9 @@ class TestScreenCapture(unittest.TestCase):
     @patch('screen_capture.get_active_app_names')
     def test_capture_focused_window_png_fallback(self, mock_get_names, mock_screenshot, mock_get_rect):
         """Test PNG capture fallback when no text is extracted."""
+        # Ensure the screen directory exists
+        os.makedirs(screen_capture.SCREEN_DIR, exist_ok=True)
+        
         # Mock dependencies
         mock_get_names.return_value = ('TestApp', 'TestApp', 'Test Window')
         mock_get_rect.return_value = {'X': 0, 'Y': 0, 'Width': 100, 'Height': 100}
@@ -199,6 +199,20 @@ class TestScreenCapture(unittest.TestCase):
         mock_image = MagicMock()
         mock_image.size = (100, 100)
         mock_image.mode = 'RGB'
+        
+        # Mock the convert method
+        def mock_convert(mode):
+            mock_image.mode = mode
+            return mock_image
+        
+        # Mock the save method to actually create a file
+        def mock_save(filename, format='PNG', **kwargs):
+            # Create the file that would be saved
+            with open(filename, 'w') as f:
+                f.write('mock png content')
+        
+        mock_image.convert = mock_convert
+        mock_image.save = mock_save
         mock_screenshot.return_value = mock_image
         
         # Test with app not in any special lists

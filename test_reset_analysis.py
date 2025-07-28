@@ -13,10 +13,7 @@ from unittest.mock import patch, MagicMock, mock_open
 from datetime import datetime
 
 # Import the module to test
-import importlib.util
-spec = importlib.util.spec_from_file_location("reset_analysis", "reset-analysis.py")
-reset_analysis = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(reset_analysis)
+import reset_analysis
 
 class TestResetAnalysis(unittest.TestCase):
     """Test cases for reset analysis functionality."""
@@ -40,14 +37,14 @@ class TestResetAnalysis(unittest.TestCase):
                 'window_title': 'test.py - activity-lens',
                 'screen_capture_filename': 'test.png',
                 'screen_text_filename': 'test.txt',
-                'summary': 'Working on Python code'
+                'activity_summary': 'Working on Python code'
             },
             {
                 'app_name': 'Google Chrome',
                 'timestamp': '2024-01-01T12:05:00',
                 'window_title': 'GitHub - username/repo',
                 'screen_capture_filename': 'chrome.png',
-                'summary': 'Browsing GitHub repository'
+                'activity_summary': 'Browsing GitHub repository'
             },
             {
                 'app_name': 'zoom_us',
@@ -140,7 +137,7 @@ class TestResetAnalysis(unittest.TestCase):
         
         # Check that summaries are gone
         for entry in data_with_summaries:
-            self.assertNotIn('summary', entry)
+            self.assertNotIn('activity_summary', entry)
         
         # Check that other fields remain
         self.assertIn('app_name', data_with_summaries[0])
@@ -283,7 +280,7 @@ class TestResetAnalysis(unittest.TestCase):
         mock_remove_summary.return_value = 2
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--summary']):
+        with patch('sys.argv', ['reset-analysis.py', '--summary', '--force']):
             reset_analysis.main()
         
         # Check that functions were called
@@ -302,7 +299,7 @@ class TestResetAnalysis(unittest.TestCase):
         mock_remove_text_filename.return_value = 1
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--text-filename']):
+        with patch('sys.argv', ['reset-analysis.py', '--text-filename', '--force']):
             reset_analysis.main()
         
         # Check that functions were called
@@ -315,19 +312,29 @@ class TestResetAnalysis(unittest.TestCase):
     @patch('reset_analysis.remove_text_files')
     def test_main_text_files_only(self, mock_remove_text_files, mock_save, mock_load):
         """Test main function with --text-files flag only."""
+        # Create screen-captures directory and text files
+        screen_captures_dir = os.path.join(self.temp_dir, 'screen-captures')
+        os.makedirs(screen_captures_dir, exist_ok=True)
+        
+        # Create the text file that exists in sample_data
+        text_file = os.path.join(screen_captures_dir, 'test.txt')
+        with open(text_file, 'w') as f:
+            f.write('test content')
+        
         # Mock dependencies
         mock_load.return_value = self.sample_data
         mock_save.return_value = True
         mock_remove_text_files.return_value = 2
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--text-files']):
+        with patch('sys.argv', ['reset-analysis.py', '--text-files', '--force']):
             reset_analysis.main()
         
         # Check that functions were called
         mock_load.assert_called_once()
         mock_remove_text_files.assert_called_once_with(self.sample_data)
-        mock_save.assert_called_once_with(self.sample_data)
+        # Note: save_json is not called for --text-files only, as it only removes files, not JSON fields
+        mock_save.assert_not_called()
     
     @patch('reset_analysis.load_json')
     @patch('reset_analysis.save_json')
@@ -345,7 +352,7 @@ class TestResetAnalysis(unittest.TestCase):
         mock_remove_text_files.return_value = 2
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--all']):
+        with patch('sys.argv', ['reset-analysis.py', '--all', '--force']):
             reset_analysis.main()
         
         # Check that all functions were called
@@ -369,7 +376,7 @@ class TestResetAnalysis(unittest.TestCase):
         mock_remove_text_filename.return_value = 1
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--summary', '--text-filename']):
+        with patch('sys.argv', ['reset-analysis.py', '--summary', '--text-filename', '--force']):
             reset_analysis.main()
         
         # Check that both functions were called
@@ -400,7 +407,7 @@ class TestResetAnalysis(unittest.TestCase):
         mock_save.return_value = False
         
         # Mock command line arguments
-        with patch('sys.argv', ['reset-analysis.py', '--summary']):
+        with patch('sys.argv', ['reset-analysis.py', '--summary', '--force']):
             reset_analysis.main()
         
         # Should still call load and save

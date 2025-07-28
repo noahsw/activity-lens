@@ -38,7 +38,7 @@ browser_apps = ['Arc', 'Google Chrome', 'Safari', 'Brave Browser', 'Microsoft Ed
 text_extraction_apps = ['Visual Studio Code', 'Sublime Text', 'Atom', 'TextEdit', 'Notes', 'Mail', 'Calendar', 'Reminders', 'Terminal', 'iTerm2']
 
 # List of apps that should only record metadata (no PNG capture, no text extraction)
-metadata_only_apps = ['zoom_us', 'FaceTime', 'Teams', 'Discord']
+metadata_only_apps = ['zoom_us', 'Zoom', 'Zoom.us', 'FaceTime', 'Teams', 'Discord']
 
 
 
@@ -184,8 +184,8 @@ def capture_focused_window():
         text = ""
         
         # Check if this app should only record metadata (no PNG, no text)
-        if raw_app_name in metadata_only_apps:
-            print(f"Active app name: {app_name} with window title: {window_title}")
+        # Check both raw name and sanitized name for flexibility
+        if raw_app_name in metadata_only_apps or app_name in metadata_only_apps:
             # Just record metadata; no file written
             metadata = {
                 'app_name': app_name,
