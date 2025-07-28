@@ -221,6 +221,11 @@ def capture_focused_window():
             # Capture high-resolution screenshot
             region = (int(bounds['X']), int(bounds['Y']), int(bounds['Width']), int(bounds['Height']))
             
+            # Validate region bounds
+            if region[2] <= 0 or region[3] <= 0:
+                print(f"Invalid window dimensions: {region}")
+                return
+            
             # Capture focused window at higher resolution for better OCR
             image = pyautogui.screenshot(region=region)
             
@@ -237,14 +242,25 @@ def capture_focused_window():
             ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
             filename = os.path.join(SCREEN_DIR, f"{ts_readable} - {app_name}.png")
             
-            # Save with maximum quality PNG settings for OCR accuracy
-            image.save(filename, 'PNG', optimize=False, compress_level=0)
-            
-            # Get file size
-            file_size_kb = os.path.getsize(filename) / 1024
-            
-            print(f"Screenshot saved as: {filename}")
-            print(f"  Image: {image.size} | Mode: {image.mode} | File size: {file_size_kb:.1f} KB")
+            try:
+                # Save with maximum quality PNG settings for OCR accuracy
+                image.save(filename, 'PNG', optimize=False, compress_level=0)
+                
+                # Get file size
+                file_size_kb = os.path.getsize(filename) / 1024
+                
+                print(f"Screenshot saved as: {filename}")
+                print(f"  Image: {image.size} | Mode: {image.mode} | File size: {file_size_kb:.1f} KB")
+            except Exception as save_error:
+                print(f"Failed to save screenshot for {app_name}: {save_error}")
+                # Fall back to just recording metadata without screenshot
+                entry = {
+                    'app_name': app_name,
+                    'timestamp': datetime.strptime(timestamp, "%Y%m%d_%H%M%S").isoformat(),
+                    'window_title': window_title
+                }
+                append_metadata(entry)
+                return
             # Write metadata to JSON for PNG capture
             entry = {
                 'screen_capture_filename': os.path.basename(filename),
