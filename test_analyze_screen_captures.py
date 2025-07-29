@@ -214,7 +214,8 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary = analyze_screen_captures.summarize_with_ollama(
-                'Test text content', 'TestApp', 'Test Window', 'llama3.2:3b'
+                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
         self.assertEqual(summary, 'This is a test summary')
@@ -230,7 +231,8 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary = analyze_screen_captures.summarize_with_ollama(
-                'Test text content', 'TestApp', 'Test Window', 'llama3.2:3b'
+                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
         self.assertIsNone(summary)
@@ -244,7 +246,8 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary = analyze_screen_captures.summarize_with_ollama(
-                'Test text content', 'TestApp', 'Test Window', 'llama3.2:3b'
+                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
         self.assertIsNone(summary)
@@ -482,6 +485,83 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
             var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
             self.assertIn(var_hash, cache, f"Cache miss for variation: {variation}")
             self.assertEqual(cache[var_hash], "Summary: User discussing AI adoption in Slack")
+
+    def test_summarize_with_ollama_short_content(self):
+        """Test that very short content returns empty summary without API call."""
+        # Test with content less than 100 characters
+        short_content = "Hello world"
+        
+        # Mock the cache to be empty initially
+        with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+            mock_load_cache.return_value = {}
+            
+            # Mock save_summary_cache to capture what gets saved
+            with patch('analyze_screen_captures.save_summary_cache') as mock_save_cache:
+                summary = analyze_screen_captures.summarize_with_ollama(
+                    short_content, 'TestApp', 'Test Window', 'llama3.2:3b'
+                )
+                
+                # Should return empty string
+                self.assertEqual(summary, "")
+                
+                # Should have saved to cache
+                mock_save_cache.assert_called_once()
+                
+                # Check what was saved to cache
+                saved_cache = mock_save_cache.call_args[0][0]
+                normalized_hash = analyze_screen_captures.get_normalized_content_hash(short_content)
+                self.assertIn(normalized_hash, saved_cache)
+                self.assertEqual(saved_cache[normalized_hash], "")
+
+    def test_summarize_with_ollama_short_content_cached(self):
+        """Test that short content uses cache when available."""
+        # Test with content less than 100 characters
+        short_content = "Hello world"
+        normalized_hash = analyze_screen_captures.get_normalized_content_hash(short_content)
+        
+        # Mock the cache to have the short content already cached
+        mock_cache = {normalized_hash: ""}
+        
+        with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+            mock_load_cache.return_value = mock_cache
+            
+            # Should not call save_summary_cache since it's already cached
+            with patch('analyze_screen_captures.save_summary_cache') as mock_save_cache:
+                summary = analyze_screen_captures.summarize_with_ollama(
+                    short_content, 'TestApp', 'Test Window', 'llama3.2:3b'
+                )
+                
+                # Should return empty string from cache
+                self.assertEqual(summary, "")
+                
+                # Should not have saved to cache again
+                mock_save_cache.assert_not_called()
+
+    def test_summarize_with_ollama_long_content(self):
+        """Test that content with 100+ characters still calls API."""
+        # Test with content exactly 100 characters
+        long_content = "This is a longer piece of text that should trigger the API call because it has exactly 100 characters in it."
+        
+        # Mock the cache to be empty initially
+        with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+            mock_load_cache.return_value = {}
+            
+            # Mock the prompt file
+            with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
+                # Mock successful API response
+                with patch('analyze_screen_captures.requests.post') as mock_post:
+                    mock_response = MagicMock()
+                    mock_response.status_code = 200
+                    mock_response.json.return_value = {'response': 'This is a test summary'}
+                    mock_post.return_value = mock_response
+                    
+                    summary = analyze_screen_captures.summarize_with_ollama(
+                        long_content, 'TestApp', 'Test Window', 'llama3.2:3b'
+                    )
+                    
+                    # Should call API and return summary
+                    self.assertEqual(summary, 'This is a test summary')
+                    mock_post.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main() 
