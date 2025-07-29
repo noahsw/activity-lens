@@ -45,11 +45,7 @@ def run_tests():
             'main_module': 'analyze_screen_captures', 
             'main_file': 'analyze-screen-captures.py'
         },
-        {
-            'test_module': 'test_analyze_screen_captures_parallel',
-            'main_module': 'analyze_screen_captures_parallel',
-            'main_file': 'analyze-screen-captures-parallel.py'
-        },
+
         {
             'test_module': 'test_reset_analysis',
             'main_module': 'reset_analysis',

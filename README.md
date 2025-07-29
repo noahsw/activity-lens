@@ -114,7 +114,6 @@ python run_tests.py
 # Or run individual test modules
 python test_screen_capture.py
 python test_analyze_screen_captures.py
-python test_analyze_screen_captures_parallel.py
 python test_prepare_activity_analysis.py
 python test_reset_analysis.py
 ```
@@ -122,7 +121,6 @@ python test_reset_analysis.py
 The test suite covers:
 - ✅ Screen capture functionality
 - ✅ OCR and text extraction
-- ✅ Parallel processing
 - ✅ Activity analysis preparation
 - ✅ Reset functionality
 - ✅ Error handling and edge cases

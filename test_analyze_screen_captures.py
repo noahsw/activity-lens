@@ -59,7 +59,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         """Test loading summary cache when file doesn't exist."""
         # Remove cache file if it exists
         if os.path.exists(analyze_screen_captures.summary_cache_file):
-            os.remove(analyze_screen_captures.summary_caches_file)
+            os.remove(analyze_screen_captures.summary_cache_file)
         
         cache = analyze_screen_captures.load_summary_cache()
         
@@ -107,6 +107,116 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
             saved_cache = json.load(f)
         
         self.assertEqual(saved_cache, sample_cache)
+    
+    @patch('analyze_screen_captures.psutil.virtual_memory')
+    def test_check_memory_usage_normal(self, mock_memory):
+        """Test memory usage check with normal levels."""
+        # Mock normal memory usage
+        mock_memory.return_value.percent = 50.0
+        
+        result = analyze_screen_captures.check_memory_usage()
+        
+        self.assertTrue(result)
+    
+    @patch('analyze_screen_captures.psutil.virtual_memory')
+    def test_check_memory_usage_high(self, mock_memory):
+        """Test memory usage check with high levels."""
+        # Mock high memory usage
+        mock_memory.return_value.percent = 90.0
+        
+        result = analyze_screen_captures.check_memory_usage()
+        
+        self.assertTrue(result)  # Should still return True for 90%
+    
+    @patch('analyze_screen_captures.psutil.virtual_memory')
+    def test_check_memory_usage_critical(self, mock_memory):
+        """Test memory usage check with critical levels."""
+        # Mock critical memory usage
+        mock_memory.return_value.percent = 96.0
+        
+        result = analyze_screen_captures.check_memory_usage()
+        
+        self.assertFalse(result)  # Should return False for >95%
+    
+    @patch('analyze_screen_captures.psutil.virtual_memory')
+    def test_check_memory_usage_exception(self, mock_memory):
+        """Test memory usage check with exception."""
+        # Mock exception
+        mock_memory.side_effect = Exception("Memory check failed")
+        
+        result = analyze_screen_captures.check_memory_usage()
+        
+        self.assertTrue(result)  # Should return True on exception
+    
+    def test_check_memory_usage_no_psutil(self):
+        """Test memory usage check when psutil is not available."""
+        # Temporarily disable psutil
+        original_psutil = analyze_screen_captures.PSUTIL_AVAILABLE
+        analyze_screen_captures.PSUTIL_AVAILABLE = False
+        
+        try:
+            result = analyze_screen_captures.check_memory_usage()
+            self.assertTrue(result)  # Should return True when psutil not available
+        finally:
+            analyze_screen_captures.PSUTIL_AVAILABLE = original_psutil
+    
+    def test_get_content_hash(self):
+        """Test content hash generation."""
+        test_content = "This is test content"
+        hash1 = analyze_screen_captures.get_content_hash(test_content)
+        hash2 = analyze_screen_captures.get_content_hash(test_content)
+        
+        # Same content should produce same hash
+        self.assertEqual(hash1, hash2)
+        
+        # Different content should produce different hash
+        different_content = "This is different content"
+        hash3 = analyze_screen_captures.get_content_hash(different_content)
+        self.assertNotEqual(hash1, hash3)
+        
+        # Hash should be a valid MD5 hex string
+        self.assertEqual(len(hash1), 32)
+        self.assertTrue(all(c in '0123456789abcdef' for c in hash1))
+    
+    @patch('analyze_screen_captures.requests.get')
+    def test_check_ollama_status_success(self, mock_get):
+        """Test successful Ollama status check."""
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'models': [
+                {'name': 'llama3.2:3b'},
+                {'name': 'mistral:7b'}
+            ]
+        }
+        mock_get.return_value = mock_response
+        
+        models = analyze_screen_captures.check_ollama_status()
+        
+        self.assertEqual(models, ['llama3.2:3b', 'mistral:7b'])
+    
+    @patch('analyze_screen_captures.requests.get')
+    def test_check_ollama_status_error(self, mock_get):
+        """Test Ollama status check with error."""
+        # Mock error response
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_get.return_value = mock_response
+        
+        models = analyze_screen_captures.check_ollama_status()
+        
+        self.assertEqual(models, [])
+    
+    @patch('analyze_screen_captures.requests.get')
+    def test_check_ollama_status_exception(self, mock_get):
+        """Test Ollama status check with exception."""
+        # Mock exception
+        mock_get.side_effect = Exception("Connection failed")
+        
+        models = analyze_screen_captures.check_ollama_status()
+        
+        self.assertEqual(models, [])
     
     @patch('analyze_screen_captures.requests.post')
     def test_summarize_with_ollama_success(self, mock_post):
@@ -208,23 +318,55 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         
         self.assertEqual(content, 'Test content')
     
-    def test_data_processing_flow(self):
-        """Test the data processing flow with sample data."""
-        # Create sample JSON file
-        sample_data = [self.sample_entry]
-        with open(analyze_screen_captures.output_json, 'w', encoding='utf-8') as f:
-            json.dump(sample_data, f)
+    def test_save_progress_safe(self):
+        """Test thread-safe progress saving."""
+        test_data = [self.sample_entry]
         
-        # Test that the JSON file was created correctly
+        success = analyze_screen_captures.save_progress_safe(test_data)
+        
+        self.assertTrue(success)
+        
+        # Check if file was saved
         self.assertTrue(os.path.exists(analyze_screen_captures.output_json))
         
-        # Test that we can read the data back
+        # Check content
         with open(analyze_screen_captures.output_json, 'r', encoding='utf-8') as f:
-            loaded_data = json.load(f)
+            saved_data = json.load(f)
         
-        self.assertEqual(loaded_data, sample_data)
-        self.assertEqual(len(loaded_data), 1)
-        self.assertEqual(loaded_data[0]['app_name'], 'TestApp')
+        self.assertEqual(saved_data, test_data)
+    
+    def test_process_with_retry_success(self):
+        """Test retry logic with successful function."""
+        def test_func():
+            return "success"
+        
+        result = analyze_screen_captures.process_with_retry(test_func)
+        
+        self.assertEqual(result, "success")
+    
+    def test_process_with_retry_failure_then_success(self):
+        """Test retry logic with initial failure then success."""
+        call_count = 0
+        
+        def test_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("First attempt failed")
+            return "success"
+        
+        result = analyze_screen_captures.process_with_retry(test_func)
+        
+        self.assertEqual(result, "success")
+        self.assertEqual(call_count, 2)
+    
+    def test_process_with_retry_all_failures(self):
+        """Test retry logic with all failures."""
+        def test_func():
+            raise Exception("Always fails")
+        
+        with self.assertRaises(Exception):
+            analyze_screen_captures.process_with_retry(test_func)
 
 if __name__ == '__main__':
     unittest.main() 
