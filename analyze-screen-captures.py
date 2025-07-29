@@ -194,7 +194,7 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
     normalized_hash = get_normalized_content_hash(text_content)
     if normalized_hash in summary_cache:
         print(f"  Using cached summary for {normalized_hash[:8]}...")
-        return summary_cache[normalized_hash]
+        return summary_cache[normalized_hash], True  # Return (summary, is_cache_hit)
     
     # Skip summarization for very short content (less than 100 characters)
     if len(text_content.strip()) < 100:
@@ -202,7 +202,7 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
         # Cache empty summary to avoid repeated API calls for same short content
         summary_cache[normalized_hash] = ""
         save_summary_cache(summary_cache)
-        return ""
+        return "", False  # Return (empty_summary, is_cache_hit=False)
     
     # Load prompt template
     try:
@@ -222,7 +222,7 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
         # Use the model passed in (checked once at startup)
         if not model_to_use:
             print("  No model available, skipping summarization")
-            return None
+            return None, False  # Return (None, is_cache_hit=False)
         
         # Call Ollama API with optimized settings
         response = requests.post(
@@ -249,14 +249,14 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
             
             save_summary_cache(summary_cache)
             
-            return summary
+            return summary, False  # Return (summary, is_cache_hit=False)
         else:
             print(f"  Ollama API error: {response.status_code}")
-            return None
+            return None, False  # Return (None, is_cache_hit=False)
             
     except Exception as e:
         print(f"  Error calling Ollama: {e}")
-        return None
+        return None, False  # Return (None, is_cache_hit=False)
 
 def process_ocr(entry):
     """Process OCR for a single entry - can run in parallel."""
@@ -359,20 +359,34 @@ def process_summarization(entry, model_to_use=None):
             def get_summary():
                 return summarize_with_ollama(text_content, entry.get('app_name', ''), entry.get('window_title', ''), model_to_use)
             
-            summary = process_with_retry(get_summary)
+            summary_result = process_with_retry(get_summary)
             
-            if summary:
-                print(f"  Summary for {text_filename}: {summary}")
+            # Unpack the result (summary, is_cache_hit)
+            if summary_result is not None:
+                summary, is_cache_hit = summary_result
                 
-                # Update the entry with the summary
-                entry['activity_summary'] = summary
-                
-                # Update progress counter
-                with progress_lock:
-                    global summary_completed
-                    summary_completed += 1
-                
-                return entry, True
+                # Check if summary is None (API failure) vs empty string (short content)
+                if summary is not None:
+                    # Summary was successful (either has content or was skipped due to short content)
+                    if is_cache_hit:
+                        print(f"  Summary cache hit for {text_filename}")
+                    elif summary:
+                        print(f"  Summary for {text_filename}: {summary}")
+                    else:
+                        print(f"  Summary skipped for {text_filename} (content too short)")
+                    
+                    # Update the entry with the summary (empty string is valid for short content)
+                    entry['activity_summary'] = summary
+                    
+                    # Update progress counter
+                    with progress_lock:
+                        global summary_completed
+                        summary_completed += 1
+                    
+                    return entry, True
+                else:
+                    print(f"  Failed to get summary for {text_filename}")
+                    return entry, False
             else:
                 print(f"  Failed to get summary for {text_filename}")
                 return entry, False

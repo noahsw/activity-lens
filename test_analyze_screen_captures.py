@@ -555,13 +555,54 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
                     mock_response.json.return_value = {'response': 'This is a test summary'}
                     mock_post.return_value = mock_response
                     
-                    summary = analyze_screen_captures.summarize_with_ollama(
+                    summary_result = analyze_screen_captures.summarize_with_ollama(
                         long_content, 'TestApp', 'Test Window', 'llama3.2:3b'
                     )
                     
-                    # Should call API and return summary
+                    # Should call API and return (summary, is_cache_hit)
+                    summary, is_cache_hit = summary_result
                     self.assertEqual(summary, 'This is a test summary')
+                    self.assertFalse(is_cache_hit)
                     mock_post.assert_called_once()
+
+    def test_process_summarization_short_content_message(self):
+        """Test that process_summarization shows 'Summary skipped for' message for short content."""
+        # Create a test entry
+        test_entry = {
+            'screen_text_filename': 'test_short.txt',
+            'app_name': 'TestApp',
+            'window_title': 'Test Window'
+        }
+        
+        # Mock file operations
+        with patch('os.path.exists') as mock_exists:
+            mock_exists.return_value = True
+            
+            with patch('builtins.open', mock_open(read_data='Short text')):
+                # Mock the cache to be empty initially
+                with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+                    mock_load_cache.return_value = {}
+                    
+                    # Mock save_summary_cache
+                    with patch('analyze_screen_captures.save_summary_cache') as mock_save_cache:
+                        # Mock check_memory_usage
+                        with patch('analyze_screen_captures.check_memory_usage') as mock_memory:
+                            mock_memory.return_value = True
+                            
+                            # Capture print output
+                            with patch('builtins.print') as mock_print:
+                                result_entry, success = analyze_screen_captures.process_summarization(
+                                    test_entry, 'llama3.2:3b'
+                                )
+                                
+                                # Should be successful (not failed)
+                                self.assertTrue(success)
+                                
+                                # Should have empty summary
+                                self.assertEqual(result_entry['activity_summary'], '')
+                                
+                                # Should print the "Summary skipped for" message
+                                mock_print.assert_any_call('  Summary skipped for test_short.txt (content too short)')
 
 if __name__ == '__main__':
     unittest.main() 
