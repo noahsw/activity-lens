@@ -45,7 +45,6 @@ def run_tests():
             'main_module': 'analyze_screen_captures', 
             'main_file': 'analyze-screen-captures.py'
         },
-
         {
             'test_module': 'test_reset_analysis',
             'main_module': 'reset_analysis',
@@ -60,11 +59,11 @@ def run_tests():
     for config in test_configs:
         test_module_name = config['test_module']
         main_module_name = config['main_module']
-        main_file_path = os.path.join(script_dir, config['main_file'])
+        main_file_path = os.path.join(script_dir, config['main_file']) if config['main_file'] else None
         
         try:
             # Load the main module (with hyphenated filename) into sys.modules
-            if os.path.exists(main_file_path):
+            if main_file_path and os.path.exists(main_file_path):
                 main_module = load_module_from_file(main_module_name, main_file_path)
                 sys.modules[main_module_name] = main_module
             

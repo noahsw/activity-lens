@@ -233,8 +233,14 @@ class TestScreenCapture(unittest.TestCase):
     @patch('screen_capture.get_active_app_names')
     def test_capture_focused_window_metadata_only(self, mock_get_names):
         """Test metadata-only capture for specific apps."""
+        # Clear any existing files from previous tests
+        for file in os.listdir(screen_capture.SCREEN_DIR):
+            file_path = os.path.join(screen_capture.SCREEN_DIR, file)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        
         # Mock app name for metadata-only app
-        mock_get_names.return_value = ('zoom_us', 'zoom_us', 'Zoom Meeting')
+        mock_get_names.return_value = ('FaceTime', 'FaceTime', 'FaceTime Call')
         
         screen_capture.capture_focused_window()
         
@@ -247,8 +253,8 @@ class TestScreenCapture(unittest.TestCase):
             data = json.load(f)
         
         self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]['app_name'], 'zoom_us')
-        self.assertEqual(data[0]['window_title'], 'Zoom Meeting')
+        self.assertEqual(data[0]['app_name'], 'FaceTime')
+        self.assertEqual(data[0]['window_title'], 'FaceTime Call')
         self.assertNotIn('screen_capture_filename', data[0])
         self.assertNotIn('screen_text_filename', data[0])
     
@@ -271,7 +277,7 @@ class TestScreenCapture(unittest.TestCase):
         
         # Check that important apps are included
         self.assertIn('Google Chrome', browser_set)
-        self.assertIn('zoom_us', metadata_set)
+        self.assertIn('FaceTime', metadata_set)
 
 if __name__ == '__main__':
     unittest.main() 

@@ -8,6 +8,7 @@ Parallel Screen Capture Analysis
 import os
 import json
 import time
+import hashlib
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -146,18 +147,22 @@ def get_normalized_content_hash(text_content):
     # Remove extra whitespace
     normalized = re.sub(r'\s+', ' ', normalized)
     
-    # Remove common punctuation that doesn't affect meaning
-    normalized = re.sub(r'[^\w\s]', '', normalized)
+    # Remove timestamps and dates BEFORE removing punctuation
+    # Remove standalone AM/PM first
+    normalized = re.sub(r'\b(AM|PM)\b', '', normalized, flags=re.IGNORECASE)
+    # Then remove time patterns
+    normalized = re.sub(r'\d{1,2}:\d{2}(:\d{2})?', '', normalized)
+    normalized = re.sub(r'\d{1,2}/\d{1,2}/\d{2,4}', '', normalized)
+    normalized = re.sub(r'\d{4}-\d{1,2}-\d{1,2}', '', normalized)
     
     # Remove common UI elements that might vary
     normalized = re.sub(r'\b(close|minimize|maximize|window|button|tab)\b', '', normalized)
     
-    # Remove timestamps and dates
-    normalized = re.sub(r'\d{1,2}:\d{2}(:\d{2})?', '', normalized)
-    normalized = re.sub(r'\d{1,2}/\d{1,2}/\d{2,4}', '', normalized)
-    
     # Remove common system text
     normalized = re.sub(r'\b(loading|saving|processing|please wait)\b', '', normalized)
+    
+    # Remove common punctuation that doesn't affect meaning (AFTER removing timestamps)
+    normalized = re.sub(r'[^\w\s]', '', normalized)
     
     # Final cleanup
     normalized = normalized.strip()
@@ -190,6 +195,14 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
     if normalized_hash in summary_cache:
         print(f"  Using cached summary for {normalized_hash[:8]}...")
         return summary_cache[normalized_hash]
+    
+    # Skip summarization for very short content (less than 100 characters)
+    if len(text_content.strip()) < 100:
+        print(f"  Content too short ({len(text_content.strip())} chars), skipping summarization")
+        # Cache empty summary to avoid repeated API calls for same short content
+        summary_cache[normalized_hash] = ""
+        save_summary_cache(summary_cache)
+        return ""
     
     # Load prompt template
     try:

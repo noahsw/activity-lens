@@ -160,23 +160,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         finally:
             analyze_screen_captures.PSUTIL_AVAILABLE = original_psutil
     
-    def test_get_content_hash(self):
-        """Test content hash generation."""
-        test_content = "This is test content"
-        hash1 = analyze_screen_captures.get_content_hash(test_content)
-        hash2 = analyze_screen_captures.get_content_hash(test_content)
-        
-        # Same content should produce same hash
-        self.assertEqual(hash1, hash2)
-        
-        # Different content should produce different hash
-        different_content = "This is different content"
-        hash3 = analyze_screen_captures.get_content_hash(different_content)
-        self.assertNotEqual(hash1, hash3)
-        
-        # Hash should be a valid MD5 hex string
-        self.assertEqual(len(hash1), 32)
-        self.assertTrue(all(c in '0123456789abcdef' for c in hash1))
+
     
     @patch('analyze_screen_captures.requests.get')
     def test_check_ollama_status_success(self, mock_get):
@@ -367,6 +351,137 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         
         with self.assertRaises(Exception):
             analyze_screen_captures.process_with_retry(test_func)
+
+    def test_get_normalized_content_hash_basic(self):
+        """Test basic normalized hash functionality."""
+        # Test that same content produces same hash
+        text1 = "User is discussing AI adoption with team members."
+        text2 = "User is discussing AI adoption with team members!"
+        
+        hash1 = analyze_screen_captures.get_normalized_content_hash(text1)
+        hash2 = analyze_screen_captures.get_normalized_content_hash(text2)
+        
+        # Should be the same after normalization
+        self.assertEqual(hash1, hash2)
+        
+        # Hash should be a valid MD5 hex string
+        self.assertEqual(len(hash1), 32)
+        self.assertTrue(all(c in '0123456789abcdef' for c in hash1))
+
+    def test_get_normalized_content_hash_case_variations(self):
+        """Test normalized hash with case variations."""
+        original = "User is discussing AI adoption with team members."
+        variations = [
+            "USER IS DISCUSSING AI ADOPTION WITH TEAM MEMBERS.",
+            "user is discussing ai adoption with team members.",
+            "User Is Discussing AI Adoption With Team Members."
+        ]
+        
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original)
+        
+        for variation in variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertEqual(original_hash, var_hash, f"Case variation failed: {variation}")
+
+    def test_get_normalized_content_hash_ui_elements(self):
+        """Test normalized hash removes UI elements."""
+        original = "Reading documentation about Python programming"
+        variations = [
+            "Reading documentation about Python programming. Loading...",
+            "Reading documentation about Python programming. Please wait...",
+            "Reading documentation about Python programming. Saving...",
+            "Reading documentation about Python programming. Close"
+        ]
+        
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original)
+        
+        for variation in variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertEqual(original_hash, var_hash, f"UI element variation failed: {variation}")
+
+    def test_get_normalized_content_hash_timestamps(self):
+        """Test normalized hash removes timestamps and dates."""
+        original = "User discussing project updates in Slack"
+        variations = [
+            "User discussing project updates in Slack. 3:45 PM",
+            "User discussing project updates in Slack. 4:12 PM",
+            "User discussing project updates in Slack. 12/15/2024",
+            "User discussing project updates in Slack. 2024-12-15"
+        ]
+        
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original)
+        
+        for variation in variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertEqual(original_hash, var_hash, f"Timestamp variation failed: {variation}")
+
+    def test_get_normalized_content_hash_whitespace(self):
+        """Test normalized hash handles whitespace variations."""
+        original = "Working on code review and testing"
+        variations = [
+            "Working on code review and testing  ",
+            "  Working on code review and testing",
+            "Working    on    code    review    and    testing",
+            "Working\non\ncode\nreview\nand\ntesting"
+        ]
+        
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original)
+        
+        for variation in variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertEqual(original_hash, var_hash, f"Whitespace variation failed: {variation}")
+
+    def test_get_normalized_content_hash_different_content(self):
+        """Test that different content produces different hashes."""
+        text1 = "User is discussing AI adoption with team members."
+        text2 = "User is discussing machine learning with team members."
+        
+        hash1 = analyze_screen_captures.get_normalized_content_hash(text1)
+        hash2 = analyze_screen_captures.get_normalized_content_hash(text2)
+        
+        # Should be different
+        self.assertNotEqual(hash1, hash2)
+
+    def test_get_normalized_content_hash_mixed_variations(self):
+        """Test normalized hash with mixed variations."""
+        original = "Working on code review and testing"
+        variations = [
+            "Working on code review and testing! Loading... 3:30 PM",
+            "WORKING ON CODE REVIEW AND TESTING. Please wait...",
+            "Working on code review and testing. 12/20/2024",
+            "Working on code review and testing. Close button"
+        ]
+        
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original)
+        
+        for variation in variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertEqual(original_hash, var_hash, f"Mixed variation failed: {variation}")
+
+    def test_normalized_hash_cache_behavior(self):
+        """Test how normalized hash would work in cache scenarios."""
+        # Simulate cache entries
+        cache = {}
+        
+        # Original content
+        original_text = "User is discussing AI adoption with team members in Slack."
+        original_hash = analyze_screen_captures.get_normalized_content_hash(original_text)
+        
+        # Add to cache
+        cache[original_hash] = "Summary: User discussing AI adoption in Slack"
+        
+        # Test variations that should hit the cache
+        cache_hit_variations = [
+            "User is discussing AI adoption with team members in Slack!",
+            "USER IS DISCUSSING AI ADOPTION WITH TEAM MEMBERS IN SLACK.",
+            "User is discussing AI adoption with team members in Slack. Loading...",
+            "User is discussing AI adoption with team members in Slack. 3:45 PM",
+        ]
+        
+        for variation in cache_hit_variations:
+            var_hash = analyze_screen_captures.get_normalized_content_hash(variation)
+            self.assertIn(var_hash, cache, f"Cache miss for variation: {variation}")
+            self.assertEqual(cache[var_hash], "Summary: User discussing AI adoption in Slack")
 
 if __name__ == '__main__':
     unittest.main() 
