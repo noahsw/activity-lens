@@ -38,7 +38,7 @@ browser_apps = ['Arc', 'Google Chrome', 'Safari', 'Brave Browser', 'Microsoft Ed
 text_extraction_apps = ['Visual Studio Code', 'Sublime Text', 'Atom', 'TextEdit', 'Notes', 'Mail', 'Calendar', 'Reminders', 'Terminal', 'iTerm2']
 
 # List of apps that should only record metadata (no PNG capture, no text extraction)
-metadata_only_apps = ['zoom_us', 'Zoom', 'Zoom.us', 'FaceTime', 'Teams', 'Discord']
+metadata_only_apps = ['FaceTime', 'Teams', 'Discord']
 
 
 
@@ -274,11 +274,11 @@ def capture_focused_window():
     except Exception as e:
         print(f"Error capturing screenshot or extracting text: {e}")
 
-def capture_focused_window_continuous(interval=5):
+def capture_focused_window_continuous(interval=15):
     """
     Continuously captures screenshots or text of the focused window every specified interval.
     Args:
-        interval (int): Time interval between captures in seconds (default: 5)
+        interval (int): Time interval between captures in seconds (default: 15)
     """
     print(f"Starting continuous capture every {interval} seconds...")
     print("Press Ctrl+C to stop")

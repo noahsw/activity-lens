@@ -37,7 +37,7 @@ Activity-Lens ingests screenshots, window titles, and OCR text, then:
 
 ## Usage
 
-1. **Capture the focused window every 5 seconds:**
+1. **Capture the focused window every 15 seconds:**
   ```sh
   python screen-capture.py
   ```
