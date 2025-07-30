@@ -9,6 +9,7 @@ import os
 import json
 import time
 import hashlib
+import argparse
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
@@ -27,8 +28,26 @@ except ImportError:
 
 # Paths
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
-input_dir = os.path.join(CACHE_DIR, 'screen-captures')
-output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
+
+def get_date_paths(date_str=None):
+    """Get the specified date or current date and return paths with date appended."""
+    if date_str:
+        # Validate date format (YYYYMMDD)
+        try:
+            datetime.strptime(date_str, '%Y%m%d')
+            current_date = date_str
+        except ValueError:
+            print(f"Error: Invalid date format '{date_str}'. Expected format: YYYYMMDD")
+            return None, None
+    else:
+        current_date = datetime.now().strftime('%Y%m%d')
+    
+    input_dir = os.path.join(CACHE_DIR, f'screen-captures-{current_date}')
+    output_json = os.path.join(CACHE_DIR, f'screen_captures_ocr-{current_date}.json')
+    return input_dir, output_json
+
+# Get current date-based paths
+input_dir, output_json = get_date_paths()
 prompt_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'summarize_screen_text_prompt.txt')
 summary_cache_file = os.path.join(CACHE_DIR, 'summary_cache.json')
 
@@ -399,7 +418,31 @@ def process_summarization(entry, model_to_use=None):
 
 def main():
     """Main execution function."""
-    global existing_data, start_time, ocr_completed, summary_completed
+    global existing_data, start_time, ocr_completed, summary_completed, input_dir, output_json
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Analyze screen captures with OCR and summarization')
+    parser.add_argument('--date', type=str, help='Date to analyze in YYYYMMDD format (default: today)')
+    args = parser.parse_args()
+    
+    # Get paths for the specified date
+    if args.date:
+        input_dir, output_json = get_date_paths(args.date)
+        if input_dir is None or output_json is None:
+            return  # Error already printed by get_date_paths
+        print(f"Analyzing data for date: {args.date}")
+    else:
+        input_dir, output_json = get_date_paths()
+        print(f"Analyzing data for today: {datetime.now().strftime('%Y%m%d')}")
+    
+    print(f"Input directory: {input_dir}")
+    print(f"Output JSON: {output_json}")
+    
+    # Check if input directory exists
+    if not os.path.exists(input_dir):
+        print(f"Error: Input directory does not exist: {input_dir}")
+        print("No screen captures found for the specified date.")
+        return
     
     # Load existing JSON data
     try:
@@ -447,6 +490,8 @@ def main():
 
     # Check Ollama availability and select model once at startup
     selected_model = None
+    ollama_available = False  # Default to False
+    
     if summary_entries:
         print(f"\nChecking Ollama availability...")
         available_models = check_ollama_status()
@@ -469,8 +514,6 @@ def main():
             
             print(f"✓ Selected Ollama model: {selected_model}")
             ollama_available = True
-    else:
-        ollama_available = False
 
     start_time = time.time()
 

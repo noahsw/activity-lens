@@ -25,6 +25,7 @@ class TestResetAnalysis(unittest.TestCase):
         self.original_cache_dir = reset_analysis.CACHE_DIR
         reset_analysis.CACHE_DIR = self.temp_dir
         reset_analysis.output_json = os.path.join(self.temp_dir, 'screen_captures_ocr.json')
+        reset_analysis.input_dir = os.path.join(self.temp_dir, 'screen-captures')
         
         # Create necessary directories
         os.makedirs(self.temp_dir, exist_ok=True)
@@ -58,6 +59,8 @@ class TestResetAnalysis(unittest.TestCase):
         # Restore original paths
         reset_analysis.CACHE_DIR = self.original_cache_dir
         reset_analysis.output_json = os.path.join(self.original_cache_dir, 'screen_captures_ocr.json')
+        # Reset input_dir to None (it will be recalculated by get_date_paths when needed)
+        reset_analysis.input_dir = None
         
         # Remove temporary directory
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -195,7 +198,7 @@ class TestResetAnalysis(unittest.TestCase):
     def test_remove_text_files(self):
         """Test removing text files from filesystem."""
         # Create screen-captures directory
-        screen_captures_dir = os.path.join(self.temp_dir, 'screen-captures')
+        screen_captures_dir = reset_analysis.input_dir
         os.makedirs(screen_captures_dir, exist_ok=True)
         
         # Create some text files
@@ -249,7 +252,7 @@ class TestResetAnalysis(unittest.TestCase):
     def test_remove_text_files_exception(self):
         """Test removing text files with exception."""
         # Create screen-captures directory
-        screen_captures_dir = os.path.join(self.temp_dir, 'screen-captures')
+        screen_captures_dir = reset_analysis.input_dir
         os.makedirs(screen_captures_dir, exist_ok=True)
         
         # Create a file that can't be removed (by making it a directory)

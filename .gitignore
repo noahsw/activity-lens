@@ -1,4 +1,4 @@
-screen_captures_ocr.json
+screen_captures_ocr*.json
 screen-captures
 bucket_ids.npy
 bucket_index.faiss

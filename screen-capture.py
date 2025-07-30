@@ -12,8 +12,16 @@ import argparse
 # Paths
 # -----------------------------------------------------------------------------
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
-SCREEN_DIR = os.path.join(CACHE_DIR, 'screen-captures')
-JSON_PATH   = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
+
+def get_date_paths():
+    """Get the current date and return paths with date appended."""
+    current_date = datetime.now().strftime('%Y%m%d')
+    screen_dir = os.path.join(CACHE_DIR, f'screen-captures-{current_date}')
+    json_path = os.path.join(CACHE_DIR, f'screen_captures_ocr-{current_date}.json')
+    return screen_dir, json_path
+
+# Get current date-based paths
+SCREEN_DIR, JSON_PATH = get_date_paths()
 os.makedirs(SCREEN_DIR, exist_ok=True)
 
 # -----------------------------------------------------------------------------

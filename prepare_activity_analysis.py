@@ -12,7 +12,15 @@ from datetime import datetime
 
 # Paths
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
-json_file = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
+
+def get_date_paths():
+    """Get the current date and return paths with date appended."""
+    current_date = datetime.now().strftime('%Y%m%d')
+    json_file = os.path.join(CACHE_DIR, f'screen_captures_ocr-{current_date}.json')
+    return json_file
+
+# Get current date-based paths
+json_file = get_date_paths()
 prompt_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'analyze_activity_prompt.txt')
 
 def load_prompt():

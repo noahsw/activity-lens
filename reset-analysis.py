@@ -11,7 +11,17 @@ from pathlib import Path
 
 # Paths
 CACHE_DIR = os.path.expanduser('~/Library/Caches/activity-lens')
-output_json = os.path.join(CACHE_DIR, 'screen_captures_ocr.json')
+
+def get_date_paths():
+    """Get the current date and return paths with date appended."""
+    from datetime import datetime
+    current_date = datetime.now().strftime('%Y%m%d')
+    output_json = os.path.join(CACHE_DIR, f'screen_captures_ocr-{current_date}.json')
+    input_dir = os.path.join(CACHE_DIR, f'screen-captures-{current_date}')
+    return output_json, input_dir
+
+# Get current date-based paths
+output_json, input_dir = get_date_paths()
 
 def load_json():
     """Load the JSON file or create empty list if it doesn't exist."""
@@ -61,7 +71,7 @@ def remove_text_filename_fields(data):
 
 def remove_text_files(data):
     """Remove .txt files that correspond to entries with screen_text_filename."""
-    input_dir = os.path.join(CACHE_DIR, 'screen-captures')
+    # input_dir is now defined globally with date
     count = 0
     
     for entry in data:
