@@ -214,7 +214,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary_result = analyze_screen_captures.summarize_with_ollama(
-                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'This is a much longer test text content that should trigger the API call because it has more than 250 characters in it to ensure proper testing of the summarization functionality with the new threshold. This additional text ensures we exceed the minimum character requirement for summarization processing.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
@@ -233,7 +233,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary_result = analyze_screen_captures.summarize_with_ollama(
-                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'This is a much longer test text content that should trigger the API call because it has more than 250 characters in it to ensure proper testing of the summarization functionality with the new threshold. This additional text ensures we exceed the minimum character requirement for summarization processing.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
@@ -250,7 +250,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
             summary_result = analyze_screen_captures.summarize_with_ollama(
-                'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
+                'This is a much longer test text content that should trigger the API call because it has more than 250 characters in it to ensure proper testing of the summarization functionality with the new threshold. This additional text ensures we exceed the minimum character requirement for summarization processing.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
@@ -498,7 +498,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
 
     def test_summarize_with_ollama_short_content(self):
         """Test that very short content returns empty summary without API call."""
-        # Test with content less than 100 characters
+        # Test with content less than 250 characters
         short_content = "Hello world"
         
         # Mock the cache to be empty initially
@@ -527,7 +527,7 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
 
     def test_summarize_with_ollama_short_content_cached(self):
         """Test that short content uses cache when available."""
-        # Test with content less than 100 characters
+        # Test with content less than 250 characters
         short_content = "Hello world"
         normalized_hash = analyze_screen_captures.get_normalized_content_hash(short_content)
         
@@ -552,9 +552,9 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
                 mock_save_cache.assert_not_called()
 
     def test_summarize_with_ollama_long_content(self):
-        """Test that content with 100+ characters still calls API."""
-        # Test with content exactly 100 characters
-        long_content = "This is a longer piece of text that should trigger the API call because it has exactly 100 characters in it."
+        """Test that content with 250+ characters still calls API."""
+        # Test with content exactly 250 characters
+        long_content = "This is a longer piece of text that should trigger the API call because it has exactly 250 characters in it to ensure proper testing of the summarization functionality with the new threshold. This additional text ensures we exceed the minimum character requirement for summarization processing."
         
         # Mock the cache to be empty initially
         with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:

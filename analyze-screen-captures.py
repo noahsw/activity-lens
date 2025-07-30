@@ -196,8 +196,8 @@ def summarize_with_ollama(text_content, app_name="", window_title="", model_to_u
         print(f"  Using cached summary for {normalized_hash[:8]}...")
         return summary_cache[normalized_hash], True  # Return (summary, is_cache_hit)
     
-    # Skip summarization for very short content (less than 100 characters)
-    if len(text_content.strip()) < 100:
+    # Skip summarization for very short content (less than 250 characters)
+    if len(text_content.strip()) < 250:
         print(f"  Content too short ({len(text_content.strip())} chars), skipping summarization")
         # Cache empty summary to avoid repeated API calls for same short content
         summary_cache[normalized_hash] = ""
