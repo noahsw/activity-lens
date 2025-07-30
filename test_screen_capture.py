@@ -193,13 +193,9 @@ class TestScreenCapture(unittest.TestCase):
             with patch('screen_capture.get_focused_window_rect') as mock_bounds:
                 mock_bounds.return_value = {'X': 100, 'Y': 100, 'Width': 100, 'Height': 100}
                 
-                # Mock screenshot (high-res capture is currently disabled)
-                with patch('screen_capture.pyautogui.screenshot') as mock_screenshot:
-                    mock_image = MagicMock()
-                    mock_image.size = (100, 100)
-                    mock_image.mode = 'RGB'
-                    mock_image.convert.return_value = mock_image
-                    mock_screenshot.return_value = mock_image
+                # Mock screencapture command
+                with patch('screen_capture.subprocess.run') as mock_run:
+                    mock_run.return_value.returncode = 0
                     
                     # Mock file operations
                     with patch('builtins.open', mock_open()):
@@ -208,8 +204,8 @@ class TestScreenCapture(unittest.TestCase):
                             
                             screen_capture.capture_focused_window()
                             
-                            # Should have called pyautogui directly (high-res disabled)
-                            mock_screenshot.assert_called_once()
+                            # Should have called screencapture
+                            mock_run.assert_called_once()
 
     def test_capture_focused_window_high_res_success(self):
         """Test high-resolution capture when it succeeds."""
@@ -221,13 +217,9 @@ class TestScreenCapture(unittest.TestCase):
             with patch('screen_capture.get_focused_window_rect') as mock_bounds:
                 mock_bounds.return_value = {'X': 100, 'Y': 100, 'Width': 100, 'Height': 100}
                 
-                # Mock screenshot (high-res capture is currently disabled)
-                with patch('screen_capture.pyautogui.screenshot') as mock_screenshot:
-                    mock_image = MagicMock()
-                    mock_image.size = (100, 100)
-                    mock_image.mode = 'RGB'
-                    mock_image.convert.return_value = mock_image
-                    mock_screenshot.return_value = mock_image
+                # Mock screencapture command
+                with patch('screen_capture.subprocess.run') as mock_run:
+                    mock_run.return_value.returncode = 0
                     
                     # Mock file operations
                     with patch('builtins.open', mock_open()):
@@ -236,8 +228,8 @@ class TestScreenCapture(unittest.TestCase):
                             
                             screen_capture.capture_focused_window()
                             
-                            # Should have called pyautogui directly (high-res disabled)
-                            mock_screenshot.assert_called_once()
+                            # Should have called screencapture
+                            mock_run.assert_called_once()
     
     @patch('screen_capture.get_active_app_names')
     def test_capture_focused_window_metadata_only(self, mock_get_names):
