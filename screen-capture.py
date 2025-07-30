@@ -41,6 +41,14 @@ text_extraction_apps = ['Visual Studio Code', 'Sublime Text', 'Atom', 'TextEdit'
 # List of apps that should only record metadata (no PNG capture, no text extraction)
 metadata_only_apps = ['FaceTime', 'Teams', 'Discord']
 
+# App-specific cropping configurations (left%, top%, right%, bottom% crop)
+# These are applied after the initial window capture
+app_cropping = {
+    'Slack': (25, 0, 0, 0),      # Crop 15% from left (sidebar)
+    'Microsoft_Outlook': (35, 0, 0, 0),
+    'zoom_us': (0, 0, 0, 10),
+}
+
 
 
 # -----------------------------------------------------------------------------
@@ -311,6 +319,34 @@ def capture_focused_window():
             # Capture the full screen and crop to the physical region
             full_screen = pyautogui.screenshot()
             image = full_screen.crop((x, y, x + width, y + height))
+            
+            # App-specific cropping (e.g., remove sidebars from chat apps)
+            app_key = app_name.lower()
+            if app_key in app_cropping:
+                left_crop_pct, top_crop_pct, right_crop_pct, bottom_crop_pct = app_cropping[app_key]
+                print(f"  {app_name} window detected, applying app-specific cropping...")
+                
+                # Calculate crop pixels based on percentages
+                left_crop_pixels = int(image.size[0] * left_crop_pct / 100)
+                top_crop_pixels = int(image.size[1] * top_crop_pct / 100)
+                right_crop_pixels = int(image.size[0] * right_crop_pct / 100)
+                bottom_crop_pixels = int(image.size[1] * bottom_crop_pct / 100)
+                
+                # Apply cropping
+                new_left = left_crop_pixels
+                new_top = top_crop_pixels
+                new_right = image.size[0] - right_crop_pixels
+                new_bottom = image.size[1] - bottom_crop_pixels
+                
+                print(f"  Original size: {image.size}")
+                print(f"  Cropping: left={left_crop_pct}%, top={top_crop_pct}%, right={right_crop_pct}%, bottom={bottom_crop_pct}%")
+                print(f"  Crop pixels: left={left_crop_pixels}, top={top_crop_pixels}, right={right_crop_pixels}, bottom={bottom_crop_pixels}")
+                
+                if new_right > new_left and new_bottom > new_top:
+                    image = image.crop((new_left, new_top, new_right, new_bottom))
+                    print(f"  Cropped to: {image.size}")
+                else:
+                    print(f"  Warning: Invalid crop dimensions, keeping original size")
             
             # Simple optimization: convert to grayscale for better OCR
             try:
