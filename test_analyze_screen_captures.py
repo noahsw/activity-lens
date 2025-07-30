@@ -213,13 +213,15 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
-            summary = analyze_screen_captures.summarize_with_ollama(
+            summary_result = analyze_screen_captures.summarize_with_ollama(
                 'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
+        summary, is_cache_hit = summary_result
         self.assertEqual(summary, 'This is a test summary')
-    
+        self.assertFalse(is_cache_hit)
+
     @patch('analyze_screen_captures.requests.post')
     def test_summarize_with_ollama_api_error(self, mock_post):
         """Test summarization with API error."""
@@ -230,13 +232,15 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
-            summary = analyze_screen_captures.summarize_with_ollama(
+            summary_result = analyze_screen_captures.summarize_with_ollama(
                 'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
+        summary, is_cache_hit = summary_result
         self.assertIsNone(summary)
-    
+        self.assertFalse(is_cache_hit)
+
     @patch('analyze_screen_captures.requests.post')
     def test_summarize_with_ollama_exception(self, mock_post):
         """Test summarization with exception."""
@@ -245,29 +249,35 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
         
         # Mock prompt file
         with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
-            summary = analyze_screen_captures.summarize_with_ollama(
+            summary_result = analyze_screen_captures.summarize_with_ollama(
                 'This is a much longer test text content that should trigger the API call because it has more than 100 characters in it to ensure proper testing of the summarization functionality.',
                 'TestApp', 'Test Window', 'llama3.2:3b'
             )
         
+        summary, is_cache_hit = summary_result
         self.assertIsNone(summary)
-    
+        self.assertFalse(is_cache_hit)
+
     def test_summarize_with_ollama_cached(self):
         """Test summarization with cached result."""
-        # Create cache with existing summary
-        sample_cache = {'test_hash': 'Cached summary'}
-        with open(analyze_screen_captures.summary_cache_file, 'w', encoding='utf-8') as f:
-            json.dump(sample_cache, f)
+        # Mock the cache to have the content already cached
+        mock_cache = {'test_hash': 'Cached summary'}
         
-        # Mock prompt file
-        with patch('builtins.open', mock_open(read_data='Summarize this text: {text}')):
-            summary = analyze_screen_captures.summarize_with_ollama(
-                'Test text content', 'TestApp', 'Test Window', 'llama3.2:3b'
-            )
+        with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+            mock_load_cache.return_value = mock_cache
+            
+            # Mock get_normalized_content_hash to return our test hash
+            with patch('analyze_screen_captures.get_normalized_content_hash') as mock_hash:
+                mock_hash.return_value = 'test_hash'
+                
+                summary_result = analyze_screen_captures.summarize_with_ollama(
+                    'Test text content', 'TestApp', 'Test Window', 'llama3.2:3b'
+                )
         
-        # Should return cached result (though hash won't match in this test)
-        # This test mainly ensures the cache loading works
-    
+        summary, is_cache_hit = summary_result
+        self.assertEqual(summary, 'Cached summary')
+        self.assertTrue(is_cache_hit)
+
     def test_ocr_processing_logic(self):
         """Test OCR processing logic with mocked dependencies."""
         # This test verifies the OCR processing logic works correctly
@@ -497,12 +507,14 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
             
             # Mock save_summary_cache to capture what gets saved
             with patch('analyze_screen_captures.save_summary_cache') as mock_save_cache:
-                summary = analyze_screen_captures.summarize_with_ollama(
+                summary_result = analyze_screen_captures.summarize_with_ollama(
                     short_content, 'TestApp', 'Test Window', 'llama3.2:3b'
                 )
                 
+                summary, is_cache_hit = summary_result
                 # Should return empty string
                 self.assertEqual(summary, "")
+                self.assertFalse(is_cache_hit)
                 
                 # Should have saved to cache
                 mock_save_cache.assert_called_once()
@@ -527,12 +539,14 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
             
             # Should not call save_summary_cache since it's already cached
             with patch('analyze_screen_captures.save_summary_cache') as mock_save_cache:
-                summary = analyze_screen_captures.summarize_with_ollama(
+                summary_result = analyze_screen_captures.summarize_with_ollama(
                     short_content, 'TestApp', 'Test Window', 'llama3.2:3b'
                 )
                 
+                summary, is_cache_hit = summary_result
                 # Should return empty string from cache
                 self.assertEqual(summary, "")
+                self.assertTrue(is_cache_hit)
                 
                 # Should not have saved to cache again
                 mock_save_cache.assert_not_called()
@@ -603,6 +617,46 @@ class TestAnalyzeScreenCaptures(unittest.TestCase):
                                 
                                 # Should print the "Summary skipped for" message
                                 mock_print.assert_any_call('  Summary skipped for test_short.txt (content too short)')
+
+    def test_process_summarization_cache_hit_message(self):
+        """Test that process_summarization shows 'Summary cache hit for' message for cached content."""
+        # Create a test entry
+        test_entry = {
+            'screen_text_filename': 'test_cached.txt',
+            'app_name': 'TestApp',
+            'window_title': 'Test Window'
+        }
+        
+        # Mock file operations
+        with patch('os.path.exists') as mock_exists:
+            mock_exists.return_value = True
+            
+            with patch('builtins.open', mock_open(read_data='This is a longer piece of text that should trigger the API call because it has more than 100 characters in it.')):
+                # Mock the cache to have the content already cached
+                normalized_hash = analyze_screen_captures.get_normalized_content_hash('This is a longer piece of text that should trigger the API call because it has more than 100 characters in it.')
+                mock_cache = {normalized_hash: 'Cached summary text'}
+                
+                with patch('analyze_screen_captures.load_summary_cache') as mock_load_cache:
+                    mock_load_cache.return_value = mock_cache
+                    
+                    # Mock check_memory_usage
+                    with patch('analyze_screen_captures.check_memory_usage') as mock_memory:
+                        mock_memory.return_value = True
+                        
+                        # Capture print output
+                        with patch('builtins.print') as mock_print:
+                            result_entry, success = analyze_screen_captures.process_summarization(
+                                test_entry, 'llama3.2:3b'
+                            )
+                            
+                            # Should be successful
+                            self.assertTrue(success)
+                            
+                            # Should have cached summary
+                            self.assertEqual(result_entry['activity_summary'], 'Cached summary text')
+                            
+                            # Should print the "Summary cache hit for" message
+                            mock_print.assert_any_call('  Summary cache hit for test_cached.txt')
 
 if __name__ == '__main__':
     unittest.main() 

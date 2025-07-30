@@ -6,6 +6,7 @@ import Quartz.CoreGraphics as CG
 import subprocess
 import json
 from PIL import Image
+import argparse
 
 # -----------------------------------------------------------------------------
 # Paths
@@ -117,6 +118,71 @@ def get_focused_window_rect():
             return bounds
     return None
 
+def capture_window_high_res(bounds):
+    """
+    Capture a window at high resolution using Core Graphics directly.
+    This handles Retina displays properly by using physical coordinates.
+    """
+    try:
+        # Get the main display ID
+        main_display = CG.CGMainDisplayID()
+        
+        if main_display == 0:
+            raise Exception("No main display available")
+            
+        # Convert logical coordinates to physical coordinates
+        x = int(bounds['X'])
+        y = int(bounds['Y'])
+        width = int(bounds['Width'])
+        height = int(bounds['Height'])
+        
+        # Validate dimensions
+        if width <= 0 or height <= 0:
+            raise Exception(f"Invalid dimensions: {width}x{height}")
+        
+        # For now, use a simpler approach that's more stable
+        # Capture the entire display and let PIL handle the cropping
+        full_display_image = CG.CGDisplayCreateImage(main_display)
+        if full_display_image is None:
+            raise Exception("Could not capture display image")
+        
+        # Get the full display dimensions
+        full_width = CG.CGImageGetWidth(full_display_image)
+        full_height = CG.CGImageGetHeight(full_display_image)
+        
+        # Get image properties
+        bytes_per_row = CG.CGImageGetBytesPerRow(full_display_image)
+        data_provider = CG.CGImageGetDataProvider(full_display_image)
+        
+        # Copy the image data
+        data = CG.CGDataProviderCopyData(data_provider)
+        if data is None:
+            CG.CGImageRelease(full_display_image)
+            raise Exception("Could not copy image data")
+        
+        try:
+            # Create PIL Image from raw data
+            full_image = Image.frombytes('RGBA', (full_width, full_height), data, 'raw', 'BGRA', bytes_per_row)
+        except Exception as e:
+            # Try with different pixel format
+            try:
+                full_image = Image.frombytes('RGB', (full_width, full_height), data, 'raw', 'BGR', bytes_per_row)
+            except Exception as e2:
+                CG.CGImageRelease(full_display_image)
+                raise Exception(f"Failed to create PIL image: {e}")
+        
+        # Clean up Core Graphics resources immediately
+        CG.CGImageRelease(full_display_image)
+        
+        # Crop the image using PIL (more stable than Core Graphics cropping)
+        cropped_image = full_image.crop((x, y, x + width, y + height))
+        
+        return cropped_image
+        
+    except Exception as e:
+        print(f"  High-res capture failed: {e}")
+        return None
+
 def get_active_app_names():
     """Return raw app name, sanitized version, and window title."""
     try:
@@ -226,17 +292,33 @@ def capture_focused_window():
                 print(f"Invalid window dimensions: {region}")
                 return
             
-            # Capture focused window at higher resolution for better OCR
-            image = pyautogui.screenshot(region=region)
+            # Capture at full Retina resolution using physical coordinates
+            print("  Capturing at full Retina resolution...")
             
-            # Optional: Scale up for even higher quality (uncomment if needed)
-            # scale_factor = 2
-            # new_size = (image.width * scale_factor, image.height * scale_factor)
-            # image = image.resize(new_size, Image.Resampling.LANCZOS)
+            # Use scale factor of 2 for Retina displays
+            scale_factor = 2
+            
+            # Convert logical coordinates to physical coordinates
+            x = int(region[0] * scale_factor)
+            y = int(region[1] * scale_factor)
+            width = int(region[2] * scale_factor)
+            height = int(region[3] * scale_factor)
+            
+            # print(f"  Logical region: {region}")
+            # print(f"  Physical region: ({x}, {y}, {width}, {height})")
+            # print(f"  Scale factor: {scale_factor}")
+            
+            # Capture the full screen and crop to the physical region
+            full_screen = pyautogui.screenshot()
+            image = full_screen.crop((x, y, x + width, y + height))
             
             # Simple optimization: convert to grayscale for better OCR
-            if image.mode != 'L':
-                image = image.convert('L')
+            try:
+                if image.mode != 'L':
+                    image = image.convert('L')
+            except Exception as convert_error:
+                print(f"  Warning: Failed to convert to grayscale: {convert_error}")
+                # Continue with original image mode
             
             # Save with optimized settings
             ts_readable = f"{timestamp[:8]} {timestamp[9:] if '_' in timestamp else timestamp[8:]}"
@@ -327,7 +409,19 @@ def slack_get_title_and_messages() -> tuple[str, str]:
         return "", ""
 
 if __name__ == "__main__":
-    # For single capture
-    # capture_focused_window()
-    # For continuous capture (uncomment the line below)
-    capture_focused_window_continuous()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Capture screen content for activity tracking')
+    parser.add_argument('--single', action='store_true', 
+                       help='Capture a single screenshot and exit (for testing)')
+    parser.add_argument('--interval', type=int, default=15,
+                       help='Interval between captures in seconds (default: 15)')
+    
+    args = parser.parse_args()
+    
+    if args.single:
+        print("📸 Single capture mode - capturing one screenshot and exiting...")
+        capture_focused_window()
+        print("✅ Single capture completed")
+    else:
+        # Continuous capture mode
+        capture_focused_window_continuous(args.interval)
