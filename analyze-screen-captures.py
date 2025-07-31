@@ -53,7 +53,7 @@ summary_cache_file = os.path.join(CACHE_DIR, 'summary_cache.json')
 
 # Configuration - Adaptive based on system capabilities
 MAX_OCR_WORKERS = min(4, multiprocessing.cpu_count())
-MAX_SUMMARY_WORKERS = min(2, max(1, MAX_OCR_WORKERS // 2))
+MAX_SUMMARY_WORKERS = 2 #min(2, max(1, MAX_OCR_WORKERS // 2))
 BATCH_SIZE = 10  # Process in smaller batches to reduce memory pressure
 SUMMARY_SEMAPHORE = threading.Semaphore(MAX_SUMMARY_WORKERS)  # Control summarization concurrency
 SAVE_LOCK = threading.Lock()  # Prevent concurrent file saves
@@ -291,9 +291,9 @@ def process_ocr(entry):
     
     try:
         # Check memory usage before processing
-        if not check_memory_usage():
-            print(f"  Skipping {filename} due to high memory usage")
-            return entry, False
+        # if not check_memory_usage():
+        #     print(f"  Skipping {filename} due to high memory usage")
+        #     return entry, False
         
         # Load and optimize image for OCR with retry logic
         def load_and_process_image():
@@ -308,7 +308,7 @@ def process_ocr(entry):
         def perform_ocr():
             return pytesseract.image_to_string(
                 image, 
-                config='--psm 6 --oem 3 --dpi 600'
+                config='--psm 6 --oem 2 --dpi 600 --c preserve_interword_spaces=1'
             )
         
         full_text = process_with_retry(perform_ocr)
@@ -354,9 +354,9 @@ def process_summarization(entry, model_to_use=None):
         
         try:
             # Check memory usage before processing
-            if not check_memory_usage():
-                print(f"  Skipping {text_filename} due to high memory usage")
-                return entry, False
+            # if not check_memory_usage():
+            #     print(f"  Skipping {text_filename} due to high memory usage")
+            #     return entry, False
             
             # Read the text content with retry logic
             def read_text_file():

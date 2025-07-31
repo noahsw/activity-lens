@@ -54,6 +54,7 @@ app_cropping = {
     'Slack': (27, 0, 0, 0),      # Crop 15% from left (sidebar)
     'Microsoft_Outlook': (40, 10, 0, 0),
     'zoom_us': (0, 0, 0, 10),
+    'ChatGPT': (14, 0, 0, 0),
 }
 
 
@@ -202,7 +203,6 @@ def capture_window_screencapture(bounds, app_name, output_path):
             '-R', f'{bounds["X"]},{bounds["Y"]},{bounds["Width"]},{bounds["Height"]}',
             '-x',  # No sound
             '-o',  # No window shadows (faster, cleaner)
-            '-r',  # No DPI metadata (faster, smaller files)
             '-a',  # No attached windows (cleaner capture)
             output_path
         ]
